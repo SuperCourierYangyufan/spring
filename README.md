@@ -134,3 +134,6 @@
     5. BeanFactoryPostProcessor，在spring中任何一个bean在new之前执行,针对beanFactory，经典为对配置类下@bean操作时进行cglib
     6. BeanDefinitionRegistryPostProcessor,是BeanFactoryPostProcessor的子类,但是他(子类)先执行，源码时这样的流程 
     7. importSelector 通过selectImports返回一个类的全名，把他变成bd.    
+6. ## MVC
+    1. 在META-INFO下配置全类名为org.springframework.web.SpringServletContainerInitializer的类，tomcat会在启动时候调用他,然后他上面有个注解@HandlesTypes(WebApplicationInitializer.class)，他会拿到实现他接口的全部类，然后在SpringServletContainerInitializer中循环调用拿到WebApplicationInitializer的onStartup方法
+    2. ServletContainerInitializer.onStartup()获得ServletContext，往里面注入自己的Servlet方法(继承HttpServlet)重写doGet/doPost方法,这样请求就可以在里面完成  
