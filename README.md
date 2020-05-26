@@ -135,5 +135,11 @@
     6. BeanDefinitionRegistryPostProcessor,是BeanFactoryPostProcessor的子类,但是他(子类)先执行，源码时这样的流程 
     7. importSelector 通过selectImports返回一个类的全名，把他变成bd.    
 6. ## MVC
-    1. 在META-INFO下配置全类名为org.springframework.web.SpringServletContainerInitializer的类，tomcat会在启动时候调用他,然后他上面有个注解@HandlesTypes(WebApplicationInitializer.class)，他会拿到实现他接口的全部类，然后在SpringServletContainerInitializer中循环调用拿到WebApplicationInitializer的onStartup方法
+    1. 在META-INFO有文件名javax.servlet.ServletContainerInitializer的配置,在里面配置全类名为org.springframework.web.SpringServletContainerInitializer的类，tomcat会在启动时候调用他,然后他上面有个注解@HandlesTypes(WebApplicationInitializer.class)，他会拿到实现他接口的全部类，然后在SpringServletContainerInitializer中循环调用拿到WebApplicationInitializer的onStartup方法
     2. ServletContainerInitializer.onStartup()获得ServletContext，往里面注入自己的Servlet方法(继承HttpServlet)重写doGet/doPost方法,这样请求就可以在里面完成  
+    3. springBoot默认使用servlet3来实现上传,实现类为StandardMultipartHttpServletRequest 
+    4. tomcat.addServlet(Context ctx,String servletName,Servlet servlet).setLoadOnStartUp(1) 会在tomcat启动时调用DispatcherServlet的父类HttpServletBean的init方法
+    5. handlerMappings两个一个是用于implements Controller 里面 路径映射对象一个是用于@Controller 里面 路径映射方法
+    6. 一个Http请求进来，进入DispatcherServlet的doService()
+    7. 得到不同的Handle进行不通的处理->适配器模式
+     
