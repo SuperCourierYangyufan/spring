@@ -273,7 +273,7 @@ public class DispatcherServlet extends FrameworkServlet {
 	/** Additional logger to use when no mapped handler is found for a request. */
 	protected static final Log pageNotFoundLogger = LogFactory.getLog(PAGE_NOT_FOUND_LOG_CATEGORY);
 
-	private static final Properties defaultStrategies;
+	private static final Properties  defaultStrategies;
 
 	static {
 		// Load default strategy implementations from properties file.
@@ -1193,7 +1193,7 @@ public class DispatcherServlet extends FrameworkServlet {
 	@Nullable
 	protected HandlerExecutionChain getHandler(HttpServletRequest request) throws Exception {
 		/**
-		  handlerMappings两个
+		  handlerMappings两个 BOOT 5个
 		  一个是用于implements Controller 里面 路径映射对象
 		 	一个是用于@Controller 里面 路径映射方法
 
