@@ -207,8 +207,12 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 	public Object getSingleton(String beanName, ObjectFactory<?> singletonFactory) {
 		Assert.notNull(beanName, "Bean name must not be null");
 		synchronized (this.singletonObjects) {
+			//从缓存中取出,为啥要在获取一次可能由于创建其他Bean过程中已经创建了bean并放到了singletonObjects
+			//此时只要从map中获取即可
 			Object singletonObject = this.singletonObjects.get(beanName);
+			//为空创建单例的object
 			if (singletonObject == null) {
+				//当工厂正处于销毁bean的状态下，不允许创建bean异常
 				if (this.singletonsCurrentlyInDestruction) {
 					throw new BeanCreationNotAllowedException(beanName,
 							"Singleton bean creation not allowed while singletons of this factory are in destruction " +
@@ -221,6 +225,8 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 				 * 将beanName添加到singletonsCurrentlyInCreation这样一个set集合中
 				 * 表示beanName对应的bean正在创建中
 				 */
+
+				//此时如果有其他的bean依赖了该bean并进行bean的创建，抛出异常
 				beforeSingletonCreation(beanName);
 				boolean newSingleton = false;
 				boolean recordSuppressedExceptions = (this.suppressedExceptions == null);
@@ -228,12 +234,16 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 					this.suppressedExceptions = new LinkedHashSet<>();
 				}
 				try {
+					//真正创建bean的地方
 					singletonObject = singletonFactory.getObject();
 					newSingleton = true;
 				}
 				catch (IllegalStateException ex) {
 					// Has the singleton object implicitly appeared in the meantime ->
 					// if yes, proceed with it since the exception indicates that state.
+					//单例对象是否在此期间隐式出现
+					//注册bean的时候如果singleObjects已经包含bean会抛出IllegalStateException
+					//此时我们可以通过捕获异常，尝试获取一次，如果未获取到
 					singletonObject = this.singletonObjects.get(beanName);
 					if (singletonObject == null) {
 						throw ex;
@@ -252,9 +262,11 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 						this.suppressedExceptions = null;
 					}
 					//把标识为正在创建的标识去掉
+					//删除掉bean正在创建中的状态
 					afterSingletonCreation(beanName);
 				}
 				if (newSingleton) {
+					//添加缓存
 					addSingleton(beanName, singletonObject);
 				}
 			}

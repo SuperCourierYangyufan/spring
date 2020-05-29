@@ -251,6 +251,7 @@ public class AnnotatedBeanDefinitionReader {
 		abd.setScope(scopeMetadata.getScopeName());
 		/**
 		 * 生成类的名字通过beanNameGenerator记得布置过一个作业
+		 * 默认拿到类的全路径名com.xx.xx.AppConfig 已.分割 得到Str 再首字母小写
 		 */
 		String beanName = (name != null ? name : this.beanNameGenerator.generateBeanName(abd, this.registry));
 		/**

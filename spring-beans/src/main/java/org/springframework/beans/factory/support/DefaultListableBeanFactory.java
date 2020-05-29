@@ -750,6 +750,7 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 		//所有bean的名字
 		// Iterate over a copy to allow for init methods which in turn register new bean definitions.
 		// While this may not be part of the regular factory bootstrap, it does otherwise work fine.
+		// 拷贝一份beanDefinitionNames的副本
 		List<String> beanNames = new ArrayList<>(this.beanDefinitionNames);
 
 		// Trigger initialization of all non-lazy singleton beans...
@@ -757,11 +758,14 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 		for (String beanName : beanNames) {
 			//合并父BeanDefinition
 			RootBeanDefinition bd = getMergedLocalBeanDefinition(beanName);
+			//bean不是抽象的类 bean是单利的 bean并不是延迟加载的
 			if (!bd.isAbstract() && bd.isSingleton() && !bd.isLazyInit()) {
 				if (isFactoryBean(beanName)) {
 					//如果是FactoryBean则加上&
 					Object bean = getBean(FACTORY_BEAN_PREFIX + beanName);
+					//如果是工厂bean
 					if (bean instanceof FactoryBean) {
+						//获取工厂bean,此时factory
 						final FactoryBean<?> factory = (FactoryBean<?>) bean;
 						boolean isEagerInit;
 						if (System.getSecurityManager() != null && factory instanceof SmartFactoryBean) {
@@ -770,15 +774,18 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 									getAccessControlContext());
 						}
 						else {
+							//判断下是否需要初始化bean
 							isEagerInit = (factory instanceof SmartFactoryBean &&
 									((SmartFactoryBean<?>) factory).isEagerInit());
 						}
+						//如果是SmartFactoryBean并且允许急切加载，则初始化factoryBean
 						if (isEagerInit) {
 							getBean(beanName);
 						}
 					}
 				}
 				else {
+					//非工厂bean直接初始化
 					getBean(beanName);
 				}
 			}
@@ -787,6 +794,7 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 		// Trigger post-initialization callback for all applicable beans...
 		for (String beanName : beanNames) {
 			Object singletonInstance = getSingleton(beanName);
+			//获取单例的实例是否 是 SmartInitializingSingleton的子类
 			if (singletonInstance instanceof SmartInitializingSingleton) {
 				final SmartInitializingSingleton smartSingleton = (SmartInitializingSingleton) singletonInstance;
 				if (System.getSecurityManager() != null) {
@@ -796,6 +804,7 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 					}, getAccessControlContext());
 				}
 				else {
+					//调用afterSingletonsInstantiated方法
 					smartSingleton.afterSingletonsInstantiated();
 				}
 			}

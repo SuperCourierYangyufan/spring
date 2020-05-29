@@ -55,6 +55,7 @@
         3. JDK动态代理不生产文件，通过字节码等信息，向记录类信息的类中插入目标对象的信息，再通过其生产目标对象
     6. 
 4. ## spring启动流程
+    1. 流程版
     ``` 
     //实例化一个工厂DefaultListableBeanFactory
     org.springframework.context.support.GenericApplicationContext->GenericApplicationContext()
@@ -126,6 +127,9 @@
     																			org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider#findCandidateComponents
     																				org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider#scanCandidateComponents
     ```     
+    2. 自我文字版本
+        1. 
+    
 5. ## 后置处理器
     1. @Configuration加上后 为全配置类,会标识为full，否则为lite,而走到后置处理器实现动态代理时，只有full才会进行cglib的动态代理
     2. 为什么实例化配置类时需要进行动态代理？因为假如在beanA初始化过程中需要走BeanB得构造方法得到B,永远是新得new B，代理则可以把工厂中存在得bean直接给与

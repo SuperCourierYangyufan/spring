@@ -216,7 +216,7 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 
 
 	/**
-	 * 手动调用的
+	 * 手动调用的 子类的实现方法
 	 * Derive further bean definitions from the configuration classes in the registry.
 	 */
 	@Override
@@ -238,6 +238,7 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 	/**
 	 * Prepare the Configuration classes for servicing bean requests at runtime
 	 * by replacing them with CGLIB-enhanced subclasses.
+	 * 父类的实现方法
 	 */
 	@Override
 	public void postProcessBeanFactory(ConfigurableListableBeanFactory beanFactory) {

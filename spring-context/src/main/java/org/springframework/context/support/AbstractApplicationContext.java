@@ -537,6 +537,9 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 				// Invoke factory processors registered as beans in the context.
 				//在spring的环境中去执行已经被注册的 factory processors
 				//设置执行自定义的ProcessBeanFactory 和spring内部自己定义的
+
+				// 调用注册的BeanFactoryPostProcessor的BeanFactoryPostProcessor,
+				// 比如设置propertyEditor到BeanFactory中
 				invokeBeanFactoryPostProcessors(beanFactory);
 
 				// Register bean processors that intercept bean creation.
@@ -632,6 +635,7 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 	 * @see #getBeanFactory()
 	 */
 	protected ConfigurableListableBeanFactory obtainFreshBeanFactory() {
+		//初始化beanFactory，对XML文件读取，并beanFactory赋值给beanFactory
 		refreshBeanFactory();
 		ConfigurableListableBeanFactory beanFactory = getBeanFactory();
 		if (logger.isDebugEnabled()) {
@@ -650,18 +654,24 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 	 */
 	protected void prepareBeanFactory(ConfigurableListableBeanFactory beanFactory) {
 		// Tell the internal bean factory to use the context's class loader etc.
+		//设置beanFactory的classLoader为当前context的classLoader
 		beanFactory.setBeanClassLoader(getClassLoader());
 		//bean表达式解释器，后面说  能够获取bean当中的属性在前台页面
+		//设置beanFactory的表达式语言处理,Spring3增加了表达式 语言支持默认可以使用#{bean.xxx}
+		//来调用相关属性值
 		beanFactory.setBeanExpressionResolver(new StandardBeanExpressionResolver(beanFactory.getBeanClassLoader()));
 		//对象与string类型的转换   <property red="dao">
+		//为beanFactory增加一个默认的propertyEditor
 		beanFactory.addPropertyEditorRegistrar(new ResourceEditorRegistrar(this, getEnvironment()));
 
 		// Configure the bean factory with context callbacks.
 		//添加一个后置管理器
 		//ApplicationContextAwareProcessor
 		// 能够在bean中获得到各种*Aware（*Aware都有其作用）
+		//该factory用于实现给定bean实现/EnvironmentAware/EmbeddedValueResolverAware/ResourceLoaderAware/ApplicationContextAware获取对应的组件
+		//就比如下面的ignoreDependencyInterface添加的接口class
 		beanFactory.addBeanPostProcessor(new ApplicationContextAwareProcessor(this));
-
+		//设置忽略自动装配的接口
 		beanFactory.ignoreDependencyInterface(EnvironmentAware.class);
 		beanFactory.ignoreDependencyInterface(EmbeddedValueResolverAware.class);
 		beanFactory.ignoreDependencyInterface(ResourceLoaderAware.class);
@@ -671,6 +681,10 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 
 		// BeanFactory interface not registered as resolvable type in a plain factory.
 		// MessageSource registered (and found for autowiring) as a bean.
+		//BeanFactory接口未在普通工厂中注册为可解析类型。 MessageSource作为bean注册（并发现用于自动装配）
+		//设置了几个自动装配的规则
+		//当使用@Autowired
+		//     private BeanFactory beanFactory Spring就会帮我们注入相关实例了
 		beanFactory.registerResolvableDependency(BeanFactory.class, beanFactory);
 		beanFactory.registerResolvableDependency(ResourceLoader.class, this);
 		beanFactory.registerResolvableDependency(ApplicationEventPublisher.class, this);
@@ -690,6 +704,12 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 		// 则注册两个Bena，Key为"systemProperties"和"systemEnvironment"，Value为Map，
 		// 这两个Bean就是一些系统配置和系统环境信息
 		// Register default environment beans.
+
+		// Detect a LoadTimeWeaver and prepare for weaving, if found.
+		// 检测到LoadTimeWeaver并准备编织（如果找到）。
+		// 增加AspectJ的支持,
+		// 如果说咱们的xml配置文件里有<aop:aspectj-autoproxy>配置，则beanFactory就包含了loadTimeWeaver
+		// 说明这时候咱们就需要开启aop
 		if (!beanFactory.containsLocalBean(ENVIRONMENT_BEAN_NAME)) {
 			beanFactory.registerSingleton(ENVIRONMENT_BEAN_NAME, getEnvironment());
 		}
@@ -725,6 +745,11 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 		//这个list是在AnnotationConfigApplicationContext被定义
 		//所谓的自定义的就是你手动调用AnnotationConfigApplicationContext.addBeanFactoryPostProcesor();
 
+
+		// 有些情况可能是通过@Bean注册了ConfigurationClassPostProcessor，然后ConfigurationClassPostProcessor
+		// 执行了某些方法使beanFactory包含了loadTimeWeaver，换句话说通过其他的方法开启AOP
+		//检测LoadTimeWeaver并准备编织（如果在此期间找到）
+		// （例如通过ConfigurationClassPostProcessor注册的@Bean方法）
 
 		PostProcessorRegistrationDelegate.invokeBeanFactoryPostProcessors(beanFactory, getBeanFactoryPostProcessors());
 

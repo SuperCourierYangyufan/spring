@@ -149,6 +149,9 @@ public class AnnotationConfigUtils {
 		if (beanFactory != null) {
 			if (!(beanFactory.getDependencyComparator() instanceof AnnotationAwareOrderComparator)) {
 				//AnnotationAwareOrderComparator主要能解析@Order注解和@Priority
+				//注解@Order或者接口Ordered的作用是定义Spring IOC容器中Bean的执行顺序的优先级(实现同一个接口,order值越小越先初始化)，而不是定义Bean的加载顺序
+				//@Qualifier官方的大概意思是，自动注入的时候，使用了这个注解，那么在候选bean中，就会用这个注解指定的那个bean
+				//@Primary官方文档的大概意思是，如果在自动注入的多个候选bean中，有一个primary bean的话，那么这个bean就会是自动注入的目标bean。可以作用在类和方法上
 				beanFactory.setDependencyComparator(AnnotationAwareOrderComparator.INSTANCE);
 			}
 			if (!(beanFactory.getAutowireCandidateResolver() instanceof ContextAnnotationAutowireCandidateResolver)) {
@@ -160,6 +163,7 @@ public class AnnotationConfigUtils {
 		Set<BeanDefinitionHolder> beanDefs = new LinkedHashSet<>(8);
 		//BeanDefinitio的注册，这里很重要，需要理解注册每个bean的类型
 		if (!registry.containsBeanDefinition(CONFIGURATION_ANNOTATION_PROCESSOR_BEAN_NAME)) {
+			//第一个后置处理器
 			//需要注意的是ConfigurationClassPostProcessor的类型是BeanDefinitionRegistryPostProcessor
 			//而 BeanDefinitionRegistryPostProcessor 最终实现BeanFactoryPostProcessor这个接口
 			RootBeanDefinition def = new RootBeanDefinition(ConfigurationClassPostProcessor.class);
@@ -168,6 +172,7 @@ public class AnnotationConfigUtils {
 		}
 
 		if (!registry.containsBeanDefinition(AUTOWIRED_ANNOTATION_PROCESSOR_BEAN_NAME)) {
+			//第二个后置处理器
 			//AutowiredAnnotationBeanPostProcessor 实现了 MergedBeanDefinitionPostProcessor
 			//MergedBeanDefinitionPostProcessor 最终实现了 BeanPostProcessor
 			RootBeanDefinition def = new RootBeanDefinition(AutowiredAnnotationBeanPostProcessor.class);
@@ -176,6 +181,7 @@ public class AnnotationConfigUtils {
 		}
 
 		if (!registry.containsBeanDefinition(REQUIRED_ANNOTATION_PROCESSOR_BEAN_NAME)) {
+			//第三个后置处理器
 			RootBeanDefinition def = new RootBeanDefinition(RequiredAnnotationBeanPostProcessor.class);
 			def.setSource(source);
 			beanDefs.add(registerPostProcessor(registry, def, REQUIRED_ANNOTATION_PROCESSOR_BEAN_NAME));
@@ -183,6 +189,7 @@ public class AnnotationConfigUtils {
 
 		// Check for JSR-250 support, and if present add the CommonAnnotationBeanPostProcessor.
 		if (jsr250Present && !registry.containsBeanDefinition(COMMON_ANNOTATION_PROCESSOR_BEAN_NAME)) {
+			//第4个后置处理器
 			RootBeanDefinition def = new RootBeanDefinition(CommonAnnotationBeanPostProcessor.class);
 			def.setSource(source);
 			beanDefs.add(registerPostProcessor(registry, def, COMMON_ANNOTATION_PROCESSOR_BEAN_NAME));
@@ -204,12 +211,14 @@ public class AnnotationConfigUtils {
 		}
 
 		if (!registry.containsBeanDefinition(EVENT_LISTENER_PROCESSOR_BEAN_NAME)) {
+			//第5个后置处理器
 			RootBeanDefinition def = new RootBeanDefinition(EventListenerMethodProcessor.class);
 			def.setSource(source);
 			beanDefs.add(registerPostProcessor(registry, def, EVENT_LISTENER_PROCESSOR_BEAN_NAME));
 		}
 
 		if (!registry.containsBeanDefinition(EVENT_LISTENER_FACTORY_BEAN_NAME)) {
+			//第6个后置处理器
 			RootBeanDefinition def = new RootBeanDefinition(DefaultEventListenerFactory.class);
 			def.setSource(source);
 			beanDefs.add(registerPostProcessor(registry, def, EVENT_LISTENER_FACTORY_BEAN_NAME));
