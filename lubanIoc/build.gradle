@@ -15,5 +15,7 @@ dependencies {
     compile(project(':spring-context'))
     compile(project(':spring-instrument'))
     compile(project(':spring-webmvc'))
+    compile(project(':spring-aop'))
+    compile(project(':spring-aspects'))
     testCompile group: 'junit', name: 'junit', version: '4.12'
 }
