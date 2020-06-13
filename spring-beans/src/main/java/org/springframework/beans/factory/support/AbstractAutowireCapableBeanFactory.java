@@ -538,7 +538,7 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 			if (!mbd.postProcessed) {
 				try {
 					//第三次后置处理器
-					//缓存注解信息
+					//缓存注解信息 如@autowried @PostConstruct
 					//MergedBeanDefinitionPostProcessor.postProcessMergedBeanDefinition(mbd, beanType, beanName);
 					applyMergedBeanDefinitionPostProcessors(mbd, beanType, beanName);
 				}

@@ -16,37 +16,13 @@
 
 package org.springframework.beans.factory.annotation;
 
-import java.beans.PropertyDescriptor;
-import java.lang.annotation.Annotation;
-import java.lang.reflect.AccessibleObject;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.PropertyValues;
 import org.springframework.beans.TypeConverter;
-import org.springframework.beans.factory.BeanCreationException;
-import org.springframework.beans.factory.BeanFactory;
-import org.springframework.beans.factory.BeanFactoryAware;
-import org.springframework.beans.factory.BeanFactoryUtils;
-import org.springframework.beans.factory.InjectionPoint;
-import org.springframework.beans.factory.NoSuchBeanDefinitionException;
-import org.springframework.beans.factory.UnsatisfiedDependencyException;
+import org.springframework.beans.factory.*;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.beans.factory.config.DependencyDescriptor;
 import org.springframework.beans.factory.config.InstantiationAwareBeanPostProcessorAdapter;
@@ -64,6 +40,12 @@ import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.ReflectionUtils;
 import org.springframework.util.StringUtils;
+
+import java.beans.PropertyDescriptor;
+import java.lang.annotation.Annotation;
+import java.lang.reflect.*;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * {@link org.springframework.beans.factory.config.BeanPostProcessor} implementation
@@ -270,6 +252,7 @@ public class AutowiredAnnotationBeanPostProcessor extends InstantiationAwareBean
 				if (candidateConstructors == null) {
 					Constructor<?>[] rawCandidates;
 					try {
+						//所有构造方法
 						rawCandidates = beanClass.getDeclaredConstructors();
 					}
 					catch (Throwable ex) {
@@ -280,6 +263,7 @@ public class AutowiredAnnotationBeanPostProcessor extends InstantiationAwareBean
 					List<Constructor<?>> candidates = new ArrayList<>(rawCandidates.length);
 					Constructor<?> requiredConstructor = null;
 					Constructor<?> defaultConstructor = null;
+					//兼容Kotlin
 					Constructor<?> primaryConstructor = BeanUtils.findPrimaryConstructor(beanClass);
 					int nonSyntheticConstructors = 0;
 					for (Constructor<?> candidate : rawCandidates) {
@@ -289,8 +273,10 @@ public class AutowiredAnnotationBeanPostProcessor extends InstantiationAwareBean
 						else if (primaryConstructor != null) {
 							continue;
 						}
+						//判断构造方法上是否有@value @autowired
 						AnnotationAttributes ann = findAutowiredAnnotation(candidate);
 						if (ann == null) {
+							//判断构造方法类是不是传过来的类
 							Class<?> userClass = ClassUtils.getUserClass(beanClass);
 							if (userClass != beanClass) {
 								try {
@@ -310,6 +296,7 @@ public class AutowiredAnnotationBeanPostProcessor extends InstantiationAwareBean
 										". Found constructor with 'required' Autowired annotation already: " +
 										requiredConstructor);
 							}
+							//拿到注解里面 required的boolean值
 							boolean required = determineRequiredStatus(ann);
 							if (required) {
 								if (!candidates.isEmpty()) {
@@ -322,9 +309,9 @@ public class AutowiredAnnotationBeanPostProcessor extends InstantiationAwareBean
 							}
 							candidates.add(candidate);
 						}
-						else if (candidate.getParameterCount() == 0) {
-							defaultConstructor = candidate;
-						}
+							else if (candidate.getParameterCount() == 0) {
+								defaultConstructor = candidate;
+							}
 					}
 					if (!candidates.isEmpty()) {
 						// Add default constructor to list of optional constructors, as fallback.
