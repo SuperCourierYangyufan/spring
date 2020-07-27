@@ -2,7 +2,6 @@ package com.luban.test;
 
 import com.luban.app.Appconfig;
 import com.luban.dao.Base;
-import com.luban.dao.IndexDao;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 
 /**
