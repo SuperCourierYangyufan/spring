@@ -13,5 +13,6 @@ public class Test {
 		AnnotationConfigApplicationContext applicationContext = new AnnotationConfigApplicationContext(Appconfig.class);
 		Base bean = applicationContext.getBean(Base.class);
 		bean.query();
+
 	}
 }
