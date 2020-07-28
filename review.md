@@ -152,6 +152,11 @@
         3. JDK6引入适应自旋、锁消除、锁粗化、轻量级锁及偏向锁等，效率有了本质上的提高
         4. JDK7引入了偏向锁和轻量级锁。都是在对象头中有标记位，不需要经过操作系统加锁。
         5. 锁可以从偏向锁升级到轻量级锁，再升级到重量级锁。这种升级过程叫做锁膨胀
+    5. 与ReentrantLock区别
+        1. ReentrantLock是Api级别的,synchronized是JVM级别的
+        2. synchronized是同步阻塞,悲观。lock是同步非阻塞,乐观
+        3. lock会自动释放锁,而Lock需要手动
+        4. Lock可以实现读写锁
 3. ReentrantLock继承Lock并实现接口中定义的方法,是一种可重入锁,除了可完成synchronized的工作外,还可相应中断锁,轮询锁请求,定时锁
         1. ReentrantLock 通过方法 lock()与 unlock()来进行加锁与解锁操作，与 synchronized 会被 JVM 自动解锁机制不同，  
         ReentrantLock 加锁后需要手动进行解锁
@@ -165,3 +170,14 @@
     5. 等待其他线程终止(Join)在当前线程中调用一个线程的 join() 方法，则当前线程转为阻塞状态，回到另主线程结束，当前线程  
     再由阻塞状态变为就绪状态，等待 cpu 的宠幸
     6. 线程唤醒（notify）
+5. CAS(比较并交换)
+    1. 包含3个参数(V 需要更新的变量,E 旧值,N 新值),且当V ==E 才会V=N
+    2. 若不相等,说明其他线程已经更新,就会返回V,也就是真实值
+    3. 运许失败后重试,知道成功,比如使用version字段,是乐观锁
+    4. ABA问题,某个线程将值从1变为0,然后再次为1.对于其他线程有可能发生在一次操作中，为感知到已变化过,version无此问题
+6. AQS 抽象的队列同步器,AQS定义了一套多线程访问共享资源的同步框架,如ReentrantLock,Semaphore,CountDownLatch
+    1. 由一个先进先出线程队列(多线程阻塞竞争阻塞时放入此队列)和一个state(资源)构成
+    2. AQS定义两种资源共享方式,如ReentrantLock的独占式,和如Semaphore,CountDownLatch共享式
+    3. AQS 只是一个框架，具体资源的获取/释放方式交由自定义同步器去实现
+    4. AQS 也支持自定义同步器同时实现独占和共享两种方式，如 ReentrantReadWriteLock。
+    
