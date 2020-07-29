@@ -203,4 +203,23 @@
     2. AQS定义两种资源共享方式,如ReentrantLock的独占式,和如Semaphore,CountDownLatch共享式
     3. AQS 只是一个框架，具体资源的获取/释放方式交由自定义同步器去实现
     4. AQS 也支持自定义同步器同时实现独占和共享两种方式，如 ReentrantReadWriteLock。
-    
+
+# 基础
+1. 反射
+    1. 动态语言指程序运行期间可以改变结构,可以增加新得函数,删除已有函数,从反射角度,java属于半动态语言
+    2. Person p=new Student(); 编译时类型为Person，运行时类型为Student
+    3. list.getClass();ArrayList.class;Class.forName("类的全路径")
+2. clone()方法需要类实现Cloneable并重写clone()
+
+#Mybatis
+1. 一级缓存
+    1. 一级缓存是指SqlSession级别的缓存，当在同一个SqlSession中进行相同的SQL语句查询时，第二次以后的查询不会从数据库查询，  
+    而是直接从缓存中获取，一级缓存最多缓存1024条SQL
+    2. 发出一个新得sql查询,查询结果写入SqlSession,结构为map(key:MapperID+offset+limit+Sql+所有的入参,value:信息)
+    2. 如果中间出现commit操作（修改、添加、删除），本sqlsession中的一级缓存区域全部清空
+2. 二级缓存
+    1. 二级缓存的范围是mapper级别（mapper同一个命名空间）
+    2. 所有的查询操作，在CacheExecutor中都会先匹配缓存中是否存在，不存在则查询数据库
+    3. key：MapperID+offset+limit+Sql+所有的入参
+
+# zookeeper
