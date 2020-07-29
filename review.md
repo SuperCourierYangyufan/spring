@@ -113,8 +113,7 @@
     1. 正常运行结束
     2. 外部设置标志内部判断跳出
     3. Interrupt方法结束线程  
-        1. 如使用了sleep,同步锁的wait,socket中的receiver,accept等方法时，会使线程处于阻塞状态。当调用线程的interrupt()  
-        方法时会抛出InterruptException异常,通过代码捕获该异常，然后break跳出循环状态
+        1. 如使用了sleep,同步锁的wait,socket中的receiver,accept等方法时，会使线程处于阻塞状态。当调用线程的interrupt() 方法时会抛出InterruptException异常,通过代码捕获该异常，然后break跳出循环状态
         2. 线程未处于阻塞状态：使用isInterrupted()判断线程的中断标志来退出循环。当使用interrupt()方法时，中断标志就会  
         置true，和使用自定义的标志来控制循环是一样的道理
     4. thread.stop()来强行终止线程,线程不安全
@@ -168,8 +167,7 @@
         3. lock会自动释放锁,而Lock需要手动
         4. Lock可以实现读写锁
 3. ReentrantLock继承Lock并实现接口中定义的方法,是一种可重入锁,除了可完成synchronized的工作外,还可相应中断锁,轮询锁请求,定时锁
-        1. ReentrantLock 通过方法 lock()与 unlock()来进行加锁与解锁操作，与 synchronized 会被 JVM 自动解锁机制不同，  
-        ReentrantLock 加锁后需要手动进行解锁
+        1. ReentrantLock 通过方法 lock()与 unlock()来进行加锁与解锁操作，与 synchronized 会被 JVM 自动解锁机制不同，ReentrantLock 加锁后需要手动进行解锁
         2. ReentrantLock 相比 synchronized 的优势是可中断、公平锁、多个锁。这种情况下需要使用 ReentrantLock
         3. 需要再finally中进行解锁操作
 4. 线程方法
@@ -222,4 +220,42 @@
     2. 所有的查询操作，在CacheExecutor中都会先匹配缓存中是否存在，不存在则查询数据库
     3. key：MapperID+offset+limit+Sql+所有的入参
 
-# zookeeper
+# netty
+1. 0拷贝
+    1. Netty的接送和发送ByteBuffer使用堆外直接内存进行Socket读写,不要进行字节缓存区的二次拷贝
+    2. 传统模式使用堆内存进行Socket读写,JVM需要将堆内存Buff拷贝到直接内存,再写入Buff
+    3. Netty可以组合多个Buff聚合成一个Buff
+    4. Netty的文件传输采用了transferTo方法,可以直接将文件缓存区的数据发送到Channel,避免了循环write导致的内存拷贝问题
+2. 内存池,特别时堆外内存分配回收十分耗时,Netty采用了基于内存池的缓存区重用机制
+3. NIO采用多个并行的串行化,实现了局部无锁化的串行线程比一个队列多个工作线程模型更优
+4. Netty RPC
+    1. 流程,RPC就是将3-8进行封装。java一般使用动态代理方式实现远程调用
+        1. 生产者使用zk注册,消费端可以通过zk获取地址
+        2. 消费方以本地调用方式调用服务
+        3. Client Stub(客户端存根)用于存放服务端地址消息,将客户端的组装方法,参数打包成网络消息,,也便是一个地址,很长的一段URL
+        4. 找到服务地址,再通过网络远程发送给服务方
+        4. Server Stub 收到消息后进行解码
+        5. Server Stub 根据解码结果调用本地方法
+        6. 本地服务执行并将结果返回给 Server Stub
+        7. Server Stub 将返回结果打包成消息并发送至消费方
+        8. Client Stub 接收到消息，并进行解码
+        9. 服务消费方得到最终结果。
+    2. 消息结构
+        1. 消费端请求结构:接口名称+方法名+参数类型和参数值+超时时间+ requestID(标识唯一请求 id)
+        2. 服务端返回结构:返回值+状态code+requestID
+    3. 通讯过程
+        1. 调用使用netty的channel.writeAndFlush()方法来发送消息二进制串,这个方法从整个调用过程来说是异步的,不知道何时返回  
+        结果,所以会向下运行(问题1)
+        2. 多线程进行方法调用,一个Client下有一个Socket,此时A线程先进来发送消息,再是B线程,有可能B的结果先返回,怎么保证对于(问题2)
+        3. 问题2:client每次通过Socket调用前需要生成唯一的RequestId,返回将其带回,通常使用AtomicLong累计生成
+        4. 问题1: 
+            1. 将处理结果的回调对象callback存放到全局ConcurrentHashMap里面put(requestID, callback)
+            2. 当线程channel.writeAndFlush()发送消息后，紧接着执行 callback 的 get()方法试图获取远程返回的结果
+            3. 在 get()内部，则使用 synchronized 获取回调对象 callback 的锁，再先检测是否已经获取到结果，如果没有，然后调用 callback 的 wait()方法，  
+            释放callback 上的锁，让当前线程处于等待状态
+            4. 服务端处理完成后,将response发给客户端,客户端Socket连接上专门监听消息的线程收到消息
+            5. 分析response,获取requestId,再从ConcurrentHashMap通过id获得callback对象
+            6. 再通过synchronized获取CallBack的锁,再将返回的结果设置到CallBack对象中
+            7. 最后通过callback.notifyAll()唤醒前面处于等待状态的线程
+    4. MRI  Java 远程方法调用，即 Java RMI是 Java 编程语言里，一种用于实现远程过程调用的应用程序编程接口
+        
