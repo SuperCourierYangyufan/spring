@@ -259,3 +259,22 @@
             7. 最后通过callback.notifyAll()唤醒前面处于等待状态的线程
     4. MRI  Java 远程方法调用，即 Java RMI是 Java 编程语言里，一种用于实现远程过程调用的应用程序编程接口
         
+# kafka
+1. 构成
+    1. broker:kafka服务器,负责消息存储和转发
+    2. topic:消息类别
+    3. partition:topic分区,一个topic可以有多个partition,topic消息保存再各个partition上
+    4. offset:消息日志中的位置,可以理解是消息再partition上的偏移量,也代表是消息的唯一序号
+    5. producer:生产者
+    6. consumer:消费者
+    7. consumer group:消费分组
+    8. zookeeper:保存broker,topic,partition等数据,还负责故障发现,partition选举,负载均衡
+2. partition
+    1. partition中每条Message包含三个属性 offset,messageSize,data
+    2. partition物理上由多个segment文件组成,每个segment相等,顺序读写
+    3. kafka为每个segment中的数据文件建立了索引,采用稀疏存储，每隔一定字节建立索引
+
+# 数据库
+1. 
+ 
+ 
