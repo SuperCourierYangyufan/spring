@@ -275,6 +275,10 @@
     3. kafka为每个segment中的数据文件建立了索引,采用稀疏存储，每隔一定字节建立索引
 
 # 数据库
-1. 
+1. 存储引擎包含InnoDB,MyIsam,memory,Archive,Federated等等
+2. InnoDB(B+树)
+    1. 5.6默认为InnoDB
+    2. 遵循ACID模式,行级别锁,一致性读
+    3. 底层为B+树,每个节点对应InnoDB的一个page,每个page大小是固定的,其中非叶子节点只有键值,叶子节点包含完整数据
  
- 
+               
