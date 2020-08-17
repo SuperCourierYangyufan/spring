@@ -172,6 +172,10 @@
         3. 需要再finally中进行解锁操作
         4. ReentrantReadWriteLock.ReadLock|ReentrantReadWriteLock.WriteLock又一个ReentrantReadWriteLock生成,读锁为共享锁,
         且当没有读锁发生时共享,读锁为排他锁
+        5. 在ReentrantLock的默认无参构造方法中，创建的是非公平锁,使用的是其中的内部类NonfairSync
+            * NonfairSync
+                - NonfairSync就是以个AQS,上锁本质上就是尝试设置state=1
+                - https://blog.csdn.net/qq_20597727/article/details/86263237
 4. 线程方法
     1. 线程等待（wait）
     2. 线程睡眠（sleep）
@@ -200,9 +204,23 @@
     4. ABA问题,某个线程将值从1变为0,然后再次为1.对于其他线程有可能发生在一次操作中，为感知到已变化过,version无此问题
 9. AQS 抽象的队列同步器,AQS定义了一套多线程访问共享资源的同步框架,如ReentrantLock,Semaphore,CountDownLatch
     1. 由一个先进先出线程队列(多线程阻塞竞争阻塞时放入此队列)和一个state(资源)构成
-    2. AQS定义两种资源共享方式,如ReentrantLock的独占式,和如Semaphore,CountDownLatch共享式
-    3. AQS 只是一个框架，具体资源的获取/释放方式交由自定义同步器去实现
-    4. AQS 也支持自定义同步器同时实现独占和共享两种方式，如 ReentrantReadWriteLock。
+    2. 如果被请求的共享资源空闲，则将当前请求资源的线程设置为有效的工作线程，并将共享资源设置为锁定状态，如果被请求的共享资源被占用，  
+    那么就需要一套线程阻塞等待以及被唤醒时锁分配的机制，这个机制AQS是用CLH队列锁实现的，即将暂时获取不到锁的线程加入到队列中
+    3. CLH队列是一个虚拟的双向队列，虚拟的双向队列即不存在队列实例，仅存在节点之间的关联关系。AQS是将每一条请求共享资源的线程封装成  
+    一个CLH锁队列的一个结点（Node），来实现锁的分配。
+    4. 用大白话来说，AQS就是基于CLH队列，用volatile修饰共享变量state，线程通过CAS去改变状态符，成功则获取锁成功，失败则进入等待队列，等待被唤醒
+    5. 流程
+        * 调用自定义同步器的tryAcquire()尝试直接去获取资源，如果成功则直接返回；
+        * 没成功，则addWaiter()将该线程加入等待队列的尾部，并标记为独占模式；
+        * quireQueued()使线程在等待队列中休息，有机会时（轮到自己，会被unpark()）会去尝试获取资源。获取到资源后才返回。  
+        如果在整个等待过程中被中断过，则返回true，否则返回false。
+        * 如果线程在等待过程中被中断过，它是不响应的。只是获取资源后才再进行自我中断selfInterrupt()，将中断补上
+    6. AQS定义两种资源共享方式,如ReentrantLock的独占式,和如Semaphore,CountDownLatch共享式
+    7. AQS 只是一个框架，具体资源的获取/释放方式交由自定义同步器去实现
+    8. status在不同情况含义不同
+        * 在ReentrantLock中，表示AQS的锁是否已经被占用获取，0：没有，>=1：已被获取,当大于1时表示被同一线程多次重入锁
+        * 在CountDownLatch中，表示计数还剩的次数，当到达0时，唤醒等待线程。
+        * 在Semaphore中，表示AQS还可以被获取锁的次数，获取一次就减1，当到达0时，尝试获取的线程将会阻塞
 
 # 基础
 1. 反射
