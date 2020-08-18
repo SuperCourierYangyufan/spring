@@ -172,10 +172,23 @@
         3. 需要再finally中进行解锁操作
         4. ReentrantReadWriteLock.ReadLock|ReentrantReadWriteLock.WriteLock又一个ReentrantReadWriteLock生成,读锁为共享锁,
         且当没有读锁发生时共享,读锁为排他锁
-        5. 在ReentrantLock的默认无参构造方法中，创建的是非公平锁,使用的是其中的内部类NonfairSync
+        5. 在ReentrantLock的默认无参构造方法中，创建的是非公平锁,使用的是其中的内部类NonfairSync,继承AbstractQueuedSynchronizer
             * NonfairSync
                 - NonfairSync就是以个AQS,上锁本质上就是尝试设置state=1
-                - https://blog.csdn.net/qq_20597727/article/details/86263237
+                - 线程只要执行lock请求,就会立马尝试获取锁,不会管AQS当前管理的等待队列中有没有正在等待的线程,这种操作是不公平的，没有先来后到
+                - CAS操作得比较与交换(compareAndSetState)利用unsafe包的cas操作，unsafe包类似一种java留给开发者的后门，  
+                可以用来直接操作内存数据，并且保证这个操作的原子性
+                - 当第一次获得锁失败,再次判断,若还是不行,判断是否为重入锁情况(获取锁线程是否为当前线程),若是则state+1
+                - 当获取失败且部位重入锁情况下,创建一个互斥得节点,放入Node链表尾部
+                - 然后让该节点判断,首先判断上个节点是否为头节点,若是得话说明是队列中最大优先级节点,不必挂起,再次尝试获取锁
+                - 若不是,检查前置节点值
+                    * 前置节点是-1，返回true表示线程可挂起
+                    * 前置节点大于0表示前置节点已经取消，那么进行跳过前置节点的操作，做链表的基本删除节点操作
+                    * 如果前置节点还是0,表示前置节点Node的waitStatus是初始值，需要设置为-1，然后外层循环重新执行  
+                    shouldParkAfterFailedAcquire方法，即可挂起当前线程
+                - 最后阻止线程,等待唤醒
+            * FairSync公平锁
+                - 与非公平锁最大区别在第一次上锁时会判断队列中是否有等待得线程,若没有才会尝试获取锁
 4. 线程方法
     1. 线程等待（wait）
     2. 线程睡眠（sleep）
@@ -293,6 +306,11 @@
     1. partition中每条Message包含三个属性 offset,messageSize,data
     2. partition物理上由多个segment文件组成,每个segment相等,顺序读写
     3. kafka为每个segment中的数据文件建立了索引,采用稀疏存储，每隔一定字节建立索引
+    
+    
+# RocketMq
+1. rocketMq分为pull模式和Push模式,push通过长轮询得pull实现
+    - push    
 
 # 数据库
 1. 存储引擎包含InnoDB,MyIsam,memory,Archive,Federated等等
@@ -516,4 +534,5 @@
     2. 对表结果修改时,会导致语句阻塞,同理,事务执行时会对表修改阻塞.DDL语句执行时会隐式的提交当前会话中的事务
     3. 为了解决幻读,提出gap锁,当给聚簇索引某行加上他后,他与前面一行不允许进行插入的,可以在尾节点record_type=3的节点加入GapLock,  
     保证该页不会有数据在数据节点后再插入,同样在内存会有存储意向插入GapLock
-        
+
+# Spring源码部分       
