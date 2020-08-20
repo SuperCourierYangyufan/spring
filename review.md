@@ -596,10 +596,10 @@
 1. @Import 可以传入四种类型：普通类、配置类、ImportSelector 的实现类,ImportBeanDefinitionRegistrar的实现类
 2. @EnableAutoConfiguration(@AutoConfigurationPackage,@Import(AutoConfigurationImportSelector.class))
     * @AutoConfigurationPackage,表示包含该注解的类所在的包应该在 AutoConfigurationPackages 中注册
-    * AutoConfigurationImportSelector:读取META-INF/spring.factories下所有的自动配置类装配到IOC容器中，之后自动配置类就会  
+    * AutoConfigurationImportSelector:读取META-INF/spring.factories(spring-boot-autoconfigure)下所有的自动配置类装配到IOC容器中，之后自动配置类就会  
     通过 ImportSelector 和 @Import 的机制被创建出来，之后就生效了
 3. SPI是一种动态替换发现的机制,在META-INF/services里面声明接口的全类名,通过ServiceLoader加载出实现它的子类
-4. @WebMvcAutoConfiguration为springMvc的配置类
+4. @WebMvcAutoConfiguration为springMvc的配置类(spring-boot-autoconfigure下META-INF/spring.factories里包含)
     * 代码
          ``` 
                     @Configuration
