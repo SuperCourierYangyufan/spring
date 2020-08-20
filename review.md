@@ -256,6 +256,12 @@
 # netty
 1. 0拷贝
     1. Netty的接送和发送ByteBuffer使用堆外直接内存进行Socket读写,不要进行字节缓存区的二次拷贝
+        * 读取本地文件,通过传统网络发送需要4次内容复制
+            1. 从磁盘复制数据到内核态内(DMA操作,无需消耗CPU)
+            2. 从内核态内存复制到应用缓冲区中,该步骤完成读取数据(copy动作,需要消耗CPU)
+            3. 然后从应用缓冲区中内存复制到网络驱动的内核态内存(copy动作,需要消耗CPU)
+            4. 后是从网络驱动的内核态内存复制到网卡中进行传输,该步骤完成发送内容
+        * 使用netty则直接取消了应用缓存区,直接将读取到的内核内数据直接复制到写出的内核数据中
     2. 传统模式使用堆内存进行Socket读写,JVM需要将堆内存Buff拷贝到直接内存,再写入Buff
     3. Netty可以组合多个Buff聚合成一个Buff
     4. Netty的文件传输采用了transferTo方法,可以直接将文件缓存区的数据发送到Channel,避免了循环write导致的内存拷贝问题
@@ -310,8 +316,59 @@
     
 # RocketMq
 1. rocketMq分为pull模式和Push模式,push通过长轮询得pull实现
-    - push    
+2. RocketMq定义了一个ProcessQueue,来解决监控和控制,比如:如何得知当前消息堆积的数量,如何重复处理某些消息,如何延迟处理某些消息
+    * ProcessQueue对象里主要的内容是一个TreeMap和一个读写锁
+        - TreeMap里以MessageQueue的Offset作为Key，以消息内容的引用为Value，保存了所有从MessageQueue获取到，但是还未被处理的消息
+        - 读写锁控制着多个线程对TreeMap对象的并发访问
+    * ProcessQueue还可以辅助实现顺序消费的逻辑
+    * 一个Topic会有多个MessageQueueOffset是指某个Topic下的一条消息在某个MessageQueue里的位置，通过Offset的值可以定位到这条消息
+        - push模式下不用关心OffsetStore的事，但是如果PullConsumer，我们就要自己处理OffsetStore了,默认用的Push
+        - offset对于每个队列都是自己下从0开始定义的,不是总数
+3. 消息发送同步发送、异步发送,单向发送,还支持延时发送和发送事务
+    * 延时发送:Broker收到这类消息后，延迟一段时间再处理，使消息在规定的一段时间后生效,时间为仅支持设值的时间长度
+    * 对事务的支持:是指发送消息事件和其他事件需要同时成功或同时失败
+        - 发送方向RocketMQ发送“待确认”消息
+        - RocketMQ将收到的“待确认”消息持久化成功后，向发送方回复消息已经发送成功，此时第一阶段消息发送完成
+        - 发送方开始执行本地事件逻辑
+        - 发送方根据本地事件执行结果向RocketMQ发送二次确认（Commit或是Rollback）消息
+        - RocketMQ收到Commit状态则将第一阶段消息标记为可投递，订阅方将能够收到该消息；
+        - 收到Rollback状态则删除第一阶段的消息，订阅方接收不到该消息。
+        - 如果出现异常情况，步骤4）提交的二次确认最终未到达RocketMQ,服务器在经过固定时间段后将对“待确认”消息、发起回查请求
+        - 发送方收到消息回查请求通过检查对应消息的本地事件执行结果返回Commit或Roolback状态
+        - RocketMQ收到回查请求后,继续按照上述逻辑处理
 
+4. NameServer维护每个机器的角色、IP地址配置信息、状态信息，其他角色都通过NameServer来协同执行
+    * NameServer是整个消息队列中的状态服务器，集群的各个组件通过它来了解全局的信息,，各个角色的机器都要定期向NameServer  
+    上报自己的状态，超时不上报的话，NameServer会认为某个机器出故障不可用了，其他的组件会把这个机器从可用列表里移 
+    * NameServer本身是无状态的，也就是说NameServer中的Broker、Topic等状态信息不会持久存储，都是由各个角色定时上报并存储到内存中的
+    * RocketMQ各个模块间的通信，可以通过发送统一格式的自定义消息,采用自己定义了一个通信协议，使得模块间传输的二进制消息和有意义的内容之间互相转换
+    * NameServer的功能虽然非常重要，但是被设计得很轻量级，代码量少并且几乎无磁盘存储，所有的功能都通过内存高效完成
+    * RocketMQ基于Netty对底层通信做了很好的抽象，使得通信功能逻辑清晰
+5. Broker是RocketMQ的核心,包括接受生产者消息,处理消费者请求、消息的持久化存储、消息的HA机制以及服务端过滤功能等
+    * 磁盘读写,顺序写速度可以达到600MB/s,而磁盘随机写的速度只有大概lOOKB/s
+    * RocketMQ消息的存储是由ConsumeQueue和CommitLog配合完成的
+        - ConsumeQueue本质队列里面放的不是数据,而是个指针,指向的是物理存储地址，也就是CommitLog里面对应的数据
+        - 在CommitLog中，一个消息的存储长度是不固定的，RocketMQ采取一些机制，尽量向CommitLog中顺序写，但是随机读
+        - Rocket分布式中,分为Master(brokerId=0)支持读写,而Slave(brokerId>0)仅支持读
+        - 所以消费者连接Slave,而生产者连接Master会大大提高效率
+    * 刷盘方式分为同步刷盘和异步刷盘
+        * 异步刷盘消息只被写入叶缓存,当消息堆积到一定程度后批量写入
+        * 同步刷盘是当返回消息状态为成功时,已经完成磁盘写入
+    * Master复制到Slave也分为同步复制与异步复制
+6. rocketMq默认不能进行全局顺序消费,若要满足全局顺序消费,需要将Top下的读写队列设置为1,简单来说就是单线程处理
+7. 若要满足部分顺序消费,则将一个消息组放入一个消息队列中即可,消费端通过MessageQueueSelector来选择发往那个消息队列,消费端  
+通过MessageListenerOrderly类来解决单MessageQueue的消息被并发处理的问题
+8. 优化
+    * 消息过滤
+        - 通过Tag进行过滤
+        - 在启动Broker前在配置文件里加上filterServer­Nums = 3这样的配置,消费端实现MessageFilter类
+    * 提高Consumer处理能力
+        - 增加Consumer实例的数量来提高并行度
+        - 设置Consumer的consumeMessageBatchMaxSize这个参数，默认是1，如果设置为N，在消息多的时候每次收到的是个长度为N的消息链表
+        - 检测延时情况，跳过非重要消息
+    * Consumer负载均衡默认五种,也可自己实现
+    
+       
 # 数据库
 1. 存储引擎包含InnoDB,MyIsam,memory,Archive,Federated等等
 2. InnoDB(B+树)
