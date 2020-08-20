@@ -593,3 +593,47 @@
     保证该页不会有数据在数据节点后再插入,同样在内存会有存储意向插入GapLock
 
 # Spring源码部分       
+1. @Import 可以传入四种类型：普通类、配置类、ImportSelector 的实现类,ImportBeanDefinitionRegistrar的实现类
+2. @EnableAutoConfiguration(@AutoConfigurationPackage,@Import(AutoConfigurationImportSelector.class))
+    * @AutoConfigurationPackage,表示包含该注解的类所在的包应该在 AutoConfigurationPackages 中注册
+    * AutoConfigurationImportSelector:读取META-INF/spring.factories下所有的自动配置类装配到IOC容器中，之后自动配置类就会  
+    通过 ImportSelector 和 @Import 的机制被创建出来，之后就生效了
+3. SPI是一种动态替换发现的机制,在META-INF/services里面声明接口的全类名,通过ServiceLoader加载出实现它的子类
+4. @WebMvcAutoConfiguration为springMvc的配置类
+    * 代码
+         ``` 
+                    @Configuration
+                    //当前环境必须是WebMvc（Servlet）环境
+                    @ConditionalOnWebApplication(type = Type.SERVLET)
+                    //当前运行环境的classpath中必须有Servlet类，DispatcherServlet类，WebMvcConfigurer类
+                    @ConditionalOnClass({ Servlet.class, DispatcherServlet.class, WebMvcConfigurer.class })
+                    //如果没有自定义WebMvc的配置类，则使用本自动配置
+                    @ConditionalOnMissingBean(WebMvcConfigurationSupport.class)
+                    @AutoConfigureOrder(Ordered.HIGHEST_PRECEDENCE + 10)
+         *           // @AutoConfigureAfter表示该类需要在DispatcherServletAutoConfiguration实例化后执行
+                    @AutoConfigureAfter({ DispatcherServletAutoConfiguration.class,
+                    		TaskExecutionAutoConfiguration.class, ValidationAutoConfiguration.class })
+                    public class WebMvcAutoConfiguration {
+         ```
+    * WebMvcAutoConfiguration->DispatcherServletAutoConfiguration->ServletWebServerFactoryAutoConfiguration
+        1. ServletWebServerFactoryAutoConfiguration下通过@Import导入ServletWebServerFactoryConfiguration.EmbeddedTomcat.class
+            ``` 
+                @Configuration
+                //@ConditionalOnClass表示当前classPath下必须有Tomcat 这个类，该配置类才会生效
+           	*     @ConditionalOnClass({ Servlet.class, Tomcat.class, UpgradeProtocol.class })
+           	    @ConditionalOnMissingBean(value = ServletWebServerFactory.class, search = SearchStrategy.CURRENT)
+           	    public static class EmbeddedTomcat {
+            
+           	    	@Bean
+           	    	public TomcatServletWebServerFactory tomcatServletWebServerFactory() {
+           	    	//初始化Tomcat
+           	    		return new TomcatServletWebServerFactory();
+           	    	}
+            
+           	    }
+            ```
+        2. DispatcherServletAutoConfiguration分别注册 DispatcherServlet和DispatcherServletRegistrationBean
+        3. WebMvcAutoConfiguration注册了国际化组件,视图解析器,静态资源映射,主页的设置,应用图标的设置等等
+        4. WebMvcAutoConfiguration注册了国际化组件注册了SpringWebMvc 中最核心的两个组件：处理器适配器、处理器映射器。
+        5. 里面大部分使用了内部静态类，为了不向外暴露这个内部类而已；毕竟只是在外部类配置场景需要用到
+                
