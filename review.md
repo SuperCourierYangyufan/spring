@@ -636,4 +636,60 @@
         3. WebMvcAutoConfiguration注册了国际化组件,视图解析器,静态资源映射,主页的设置,应用图标的设置等等
         4. WebMvcAutoConfiguration注册了国际化组件注册了SpringWebMvc 中最核心的两个组件：处理器适配器、处理器映射器。
         5. 里面大部分使用了内部静态类，为了不向外暴露这个内部类而已；毕竟只是在外部类配置场景需要用到
+5. 启动流程
+    1. 创建SpringApplication
+        ``` 
+            @SuppressWarnings({ "unchecked", "rawtypes" })
+            public SpringApplication(ResourceLoader resourceLoader, Class<?>... primarySources) {
+                // resourceLoader为null
+                this.resourceLoader = resourceLoader;
+                Assert.notNull(primarySources, "PrimarySources must not be null");
+                // 将传入的DemoApplication启动类放入primarySources中，这样应用就知道主启动类在哪里，叫什么了
+                // SpringBoot一般称呼这种主启动类叫primarySource（主配置资源来源）
+                this.primarySources = new LinkedHashSet<>(Arrays.asList(primarySources));
+                // 3.1 判断当前应用环境
+                this.webApplicationType = WebApplicationType.deduceFromClasspath();
+                // 3.2 设置初始化器
+                setInitializers((Collection) getSpringFactoriesInstances(ApplicationContextInitializer.class));
+                // 3.3 设置监听器
+                setListeners((Collection) getSpringFactoriesInstances(ApplicationListener.class));
+                // 3.4 确定主配置类
+                this.mainApplicationClass = deduceMainApplicationClass();
+            }
+        ```
+        * (3.1)WebApplicationType.deduceFromClasspath()来决定是什么环境，本质上扫描是否有Reactiv的包,是否  
+          有Servlet相关的类,若都没有就是个普通应用
+        * (3.2)Initializers用于在刷新容器之前初始化Spring ConfigurableApplicationContext 的回调接口
+        * (3.2)三种实现方式:实现ApplicationContextInitializer,application.properties中配置,spring.factories中配置   
+        * (3.3)ApplicationListener由应用程序事件监听器实现的接口。基于观察者模式的标准 java.util.EventListener 接口。
+        * (3.4)从deduceMainApplicationClass 方法开始往上爬，哪一层调用栈上有main方法，方法对应的类就是主配置类，就返回这个类
+    2. run方法
+        ``` 
+        public ConfigurableApplicationContext run(String... args) {
+            // 4.1 创建StopWatch对象
+            StopWatch stopWatch = new StopWatch();
+            stopWatch.start();
+            // 4.2 创建空的IOC容器，和一组异常报告器
+            ConfigurableApplicationContext context = null;
+            Collection<SpringBootExceptionReporter> exceptionReporters = new ArrayList<>();
+            // 4.3 即使没有检测到显示器,也允许其启动.对于服务器来说,是不需要显示器的,所以要这样设置
+            configureHeadlessProperty();
+            // 4.4 获取SpringApplicationRunListeners，并调用starting方法（回调机制）
+            SpringApplicationRunListeners listeners = getRunListeners(args);
+            // 【回调】首次启动run方法时立即调用。可用于非常早期的初始化（准备运行时环境之前）。
+            listeners.starting();
+            try {
+                // 将main方法的args参数封装到一个对象中
+                ApplicationArguments applicationArguments = new DefaultApplicationArguments(args);
+                // 4.5 准备运行时环境
+                ConfigurableEnvironment environment = prepareEnvironment(listeners, applicationArguments);
+                //.............
+            }
+        ```
+        * (4.1)new 一个StopWatch用于统计run启动过程花了多少时间
+        * (4.4)SpringApplicationRunListeners是监听SpringApplication运行方法。 
+        * (4.5)Environment它是IOC容器的运行环境，它包括Profile和Properties两大部分，它可由一个到几个激活的Profile共同配置，  
+        它的配置可在应用级Bean中获取 
+        * (4.5)意义为准备环境变量，包括系统变量，环境变量，命令行参数，默认变量，servlet相关配置变量，随机值JNDI属性值，  
+        以及配置文件（比如application.properties）等，注意这些环境变量是有优先级的 
                 
