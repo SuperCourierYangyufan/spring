@@ -16,30 +16,14 @@
 
 package org.springframework.context.annotation;
 
-import java.beans.PropertyDescriptor;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 import org.springframework.aop.framework.autoproxy.AutoProxyUtils;
 import org.springframework.beans.PropertyValues;
 import org.springframework.beans.factory.BeanClassLoaderAware;
 import org.springframework.beans.factory.BeanDefinitionStoreException;
 import org.springframework.beans.factory.BeanFactory;
-import org.springframework.beans.factory.config.BeanDefinition;
-import org.springframework.beans.factory.config.BeanDefinitionHolder;
-import org.springframework.beans.factory.config.BeanFactoryPostProcessor;
-import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
-import org.springframework.beans.factory.config.InstantiationAwareBeanPostProcessorAdapter;
-import org.springframework.beans.factory.config.SingletonBeanRegistry;
+import org.springframework.beans.factory.config.*;
 import org.springframework.beans.factory.parsing.FailFastProblemReporter;
 import org.springframework.beans.factory.parsing.PassThroughSourceExtractor;
 import org.springframework.beans.factory.parsing.ProblemReporter;
@@ -64,13 +48,18 @@ import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
 
+import java.beans.PropertyDescriptor;
+import java.util.*;
+
 import static org.springframework.context.annotation.AnnotationConfigUtils.CONFIGURATION_BEAN_NAME_GENERATOR;
 
 /**
  * 扫描、解析注解、imprt
  * {@link BeanFactoryPostProcessor} used for bootstrapping processing of
  * {@link Configuration @Configuration} classes.
- *
+ *BeanFactoryPostProcessor，用于 @Configuration 类的扫描加载处理。 使用<context：annotation-config />
+ * 或 <context：component-scan /> 时默认注册。否则，可以像其他任何 BeanFactoryPostProcessor 一样手动声明。
+ * 此后处理器按优先级排序，因为在 @Configuration 标注的类中声明的任何Bean方法在执行任何其他 BeanFactoryPostProcessor 之前都要注册其相应的Bean定义，这一点很重要。
  * <p>Registered by default when using {@code <context:annotation-config/>} or
  * {@code <context:component-scan/>}. Otherwise, may be declared manually as
  * with any other BeanFactoryPostProcessor.
@@ -271,8 +260,8 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 		String[] candidateNames = registry.getBeanDefinitionNames();
 
 		/**
-		 * Full
-		 * Lite
+		 * full：@Configuration 标注的类
+		 * lite：有 @Component 、@ComponentScan 、@Import 、@ImportResource 标注的类，以及 @Configuration 中标注 @Bean 的类
 		 */
 		for (String beanName : candidateNames) {
 			BeanDefinition beanDef = registry.getBeanDefinition(beanName);
@@ -365,11 +354,13 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 			 */
 
 			//bd 到 map 除却普通
+			//这里它会循环所有的配置类，去加载配置类里面的Bean定义信息
 			this.reader.loadBeanDefinitions(configClasses);
 			alreadyParsed.addAll(configClasses);
 
 			candidates.clear();
 			//由于我们这里进行了扫描，把扫描出来的BeanDefinition注册给了factory
+			//它要比对 BeanDefinition 的个数，以及被处理过的数量。只要数量不对应，就会展开那些配置类继续加载。这部分的源码与上面比较类似，只是检测逻辑的不同
 			//但是
 			if (registry.getBeanDefinitionCount() > candidateNames.length) {
 				String[] newCandidateNames = registry.getBeanDefinitionNames();

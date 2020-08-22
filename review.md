@@ -795,5 +795,19 @@
                 }
             ``` 
           * (1)其中initPropertySources()虽然为空方法,但是在servlet环境下有实现,会把web.xml等信息放入IOC
-          *    
+          * (3)BeanPostProcessor它通常被称为 “Bean的后置处理器“它可以在对象实例化但初始化之前，以及初始化之后进行一些后置处理
+          * (4)org.springframework.boot.web.servlet.context.AnnotationConfigServletWebServerApplicationContext#postProcessBeanFactory为实现类
+          * (4)把ServletContext,ServletConfig注入到组件中,且将Web的几种作用域注册到 BeanFactory 中。
+          * (5)执行beanFactory的后置处理器,里面进行了包扫描等等操作
+          * (5)注意执行的org.springframework.context.annotation.ConfigurationClassPostProcessor.postProcessBeanDefinitionRegistry,会加载出所有类信息
+            
+6. 执行顺序 构造方法->BeanPostProcessor的before方法->@PostConstruct/init-method->InitializingBean的afterPropertiesSet方法->BeanPostProcessor的after方法 
+7. BeanFactoryPostProcessor是在所有的 BeanDefinition 已经被加载，但没有Bean被实例化,可以对 BeanFactory 进行后置处理。BeanDefinitionRegistryPostProcessor  
+它的执行时机是所有Bean的定义信息即将被加载但未实例化时，也就是先于 BeanFactoryPostProcessor;总结就是【规律】BeanPostProcessor 是对Bean的后置处理，BeanFactoryPostProcessor   
+是对 BeanFactory 的后置处理
+8. spring会把classPath下所有class文件解析出来,然后使用类加载器，把传入的根包以Resource的形式加载出来,然后通过一个MetadataReader来解析.class文件，  
+它就可以读取这个class的类定义信息、注解标注信息。之后要用 MetadataReader 来判断这个class是否为一个 Component,判定为 Component 后，  
+会将这个class封装为 BeanDefinition，最后返回
+9. org.springframework.context.annotation.AnnotationBeanNameGenerator为注解的bean名称生成器,规则为看这些模式注解上是否有  
+显式的声明 value 属性，如果没有则进入下面的 buildDefaultBeanName 方法，它会取类名的全称，之后调 Introspector.decapitalize 方法将首字母转为小写
                 

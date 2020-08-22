@@ -656,6 +656,8 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 		//设置了几个自动装配的规则
 		//当使用@Autowired
 		//     private BeanFactory beanFactory Spring就会帮我们注入相关实例了
+		//它大概的意思是如果遇到一个特殊的依赖类型，就使用一个特殊的预先准备好的对象装配进去。
+		//它可以支持一些特殊依赖关系的类型，并放到 resolvableDependencies 集合中保存，使得能在任意位置注入上述源码中的组件
 		beanFactory.registerResolvableDependency(BeanFactory.class, beanFactory);
 		beanFactory.registerResolvableDependency(ResourceLoader.class, this);
 		beanFactory.registerResolvableDependency(ApplicationEventPublisher.class, this);

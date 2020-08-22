@@ -16,23 +16,17 @@
 
 package org.springframework.context.support;
 
-import java.security.AccessControlContext;
-import java.security.AccessController;
-import java.security.PrivilegedAction;
-
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.Aware;
 import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.beans.factory.config.EmbeddedValueResolver;
-import org.springframework.context.ApplicationContextAware;
-import org.springframework.context.ApplicationEventPublisherAware;
-import org.springframework.context.ConfigurableApplicationContext;
-import org.springframework.context.EmbeddedValueResolverAware;
-import org.springframework.context.EnvironmentAware;
-import org.springframework.context.MessageSourceAware;
-import org.springframework.context.ResourceLoaderAware;
+import org.springframework.context.*;
 import org.springframework.lang.Nullable;
 import org.springframework.util.StringValueResolver;
+
+import java.security.AccessControlContext;
+import java.security.AccessController;
+import java.security.PrivilegedAction;
 
 /**
  *
@@ -44,6 +38,12 @@ import org.springframework.util.StringValueResolver;
  * implement the {@link EnvironmentAware}, {@link EmbeddedValueResolverAware},
  * {@link ResourceLoaderAware}, {@link ApplicationEventPublisherAware},
  * {@link MessageSourceAware} and/or {@link ApplicationContextAware} interfaces.
+ *
+ *  * BeanPostProcessor 实现，它将 ApplicationContext 传递给实现 EnvironmentAware，EmbeddedValueResolverAware，ResourceLoaderAware，ApplicationEventPublisherAware，MessageSourceAware 和/或 ApplicationContextAware 接口的bean。
+ *  *
+ *  * 按照上面提到的顺序满足已实现的接口。
+ *  *
+ *  * IOC容器将自动在其基础bean工厂中注册它。应用程序不直接使用它
  *
  * <p>Implemented interfaces are satisfied in order of their mention above.
  *
