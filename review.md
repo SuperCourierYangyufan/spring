@@ -794,5 +794,6 @@
                     }
                 }
             ``` 
-          * (1)   
+          * (1)其中initPropertySources()虽然为空方法,但是在servlet环境下有实现,会把web.xml等信息放入IOC
+          *    
                 
