@@ -683,7 +683,20 @@
                 ApplicationArguments applicationArguments = new DefaultApplicationArguments(args);
                 // 4.5 准备运行时环境
                 ConfigurableEnvironment environment = prepareEnvironment(listeners, applicationArguments);
-                //.............
+               // 4.6 如果有配置 spring.beaninfo.ignore，则将该配置设置进系统参数
+               configureIgnoreBeanInfo(environment);
+               // 4.7 打印SpringBoot的banner
+               Banner printedBanner = printBanner(environment);
+               // 4.8 创建ApplicationContext
+               context = createApplicationContext();
+               // 初始化异常报告器
+               exceptionReporters = getSpringFactoriesInstances(SpringBootExceptionReporter.class,
+                       new Class[] { ConfigurableApplicationContext.class }, context);
+               // 4.9 初始化IOC容器
+               prepareContext(context, environment, listeners, applicationArguments, printedBanner);
+               // 4.10 bean的生命流程,刷新容器,最重要
+               refreshContext(context);
+               afterRefresh(context, applicationArguments);
             }
         ```
         * (4.1)new 一个StopWatch用于统计run启动过程花了多少时间
@@ -692,4 +705,94 @@
         它的配置可在应用级Bean中获取 
         * (4.5)意义为准备环境变量，包括系统变量，环境变量，命令行参数，默认变量，servlet相关配置变量，随机值JNDI属性值，  
         以及配置文件（比如application.properties）等，注意这些环境变量是有优先级的 
+        * (4.8)里面根据运行环境创建ApplicationContext,在实例化时先初始化父类构造方法创建(this.beanFactory = new DefaultListableBeanFactory();)
+        * (4.9)IOC容器初始化工作
+            - 将创建好的应用环境设置到IOC容器中
+            - 将beanName生成器,资源加载器,类加载器,类转化器放入IOC
+            - 会获取到所有 Initializer，调用initialize方法
+            - 生成一个bean加载器(就是注解驱动的Bean定义解析器,Xml定义的Bean定义解析器类路径下的Bean定义扫描器的整合)
+            - 进入load()方法,循环所有的sources(仅主启动类一个),根据类型判断(判断为类),再判断是否含有注解Component,最后annotatedReader.register
+            - 到这一步,就将主启动类生成为BeanDefinition 放入了IOC容器中
+        * (4.10)刷新容器
+            ``` 
+                public void refresh() throws BeansException, IllegalStateException {
+                    synchronized (this.startupShutdownMonitor) {
+                        // Prepare this context for refreshing.
+                        // 1. 初始化前的预处理
+                        prepareRefresh();
+                
+                        // Tell the subclass to refresh the internal bean factory.
+                        // 2. 获取BeanFactory，加载所有bean的定义信息（未实例化）
+                        ConfigurableListableBeanFactory beanFactory = obtainFreshBeanFactory();
+                
+                        // Prepare the bean factory for use in this context.
+                        // 3. BeanFactory的预处理配置
+                        prepareBeanFactory(beanFactory);
+                
+                        try {
+                            // Allows post-processing of the bean factory in context subclasses.
+                            // 4. 准备BeanFactory完成后进行的后置处理
+                            postProcessBeanFactory(beanFactory);
+                
+                            // Invoke factory processors registered as beans in the context.
+                            // 5. 执行BeanFactory创建后的后置处理器
+                            invokeBeanFactoryPostProcessors(beanFactory);
+                
+                            // Register bean processors that intercept bean creation.
+                            // 6. 注册Bean的后置处理器
+                            registerBeanPostProcessors(beanFactory);
+                
+                            // Initialize message source for this context.
+                            // 7. 初始化MessageSource
+                            initMessageSource();
+                
+                            // Initialize event multicaster for this context.
+                            // 8. 初始化事件派发器
+                            initApplicationEventMulticaster();
+                
+                            // Initialize other special beans in specific context subclasses.
+                            // 9. 子类的多态onRefresh
+                            onRefresh();
+                
+                            // Check for listener beans and register them.
+                            // 10. 注册监听器
+                            registerListeners();
+                          
+                            //到此为止，BeanFactory已创建完成
+                
+                            // Instantiate all remaining (non-lazy-init) singletons.
+                            // 11. 初始化所有剩下的单例Bean
+                            finishBeanFactoryInitialization(beanFactory);
+                
+                            // Last step: publish corresponding event.
+                            // 12. 完成容器的创建工作
+                            finishRefresh();
+                        }
+                
+                        catch (BeansException ex) {
+                            if (logger.isWarnEnabled()) {
+                                logger.warn("Exception encountered during context initialization - " +
+                                        "cancelling refresh attempt: " + ex);
+                            }
+                
+                            // Destroy already created singletons to avoid dangling resources.
+                            destroyBeans();
+                
+                            // Reset 'active' flag.
+                            cancelRefresh(ex);
+                
+                            // Propagate exception to caller.
+                            throw ex;
+                        }
+                
+                        finally {
+                            // Reset common introspection caches in Spring's core, since we
+                            // might not ever need metadata for singleton beans anymore...
+                            // 13. 清除缓存
+                            resetCommonCaches();
+                        }
+                    }
+                }
+            ``` 
+          * (1)   
                 
