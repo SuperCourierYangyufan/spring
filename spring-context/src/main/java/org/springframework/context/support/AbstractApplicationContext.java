@@ -525,7 +525,7 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 				//初始化应用事件广播器
 				initApplicationEventMulticaster();
 
-				// Initialize other special beans in specific context subclasses.
+				// SpringBoot 扩展的IOC容器中对这个方法进行了真正地实现
 				onRefresh();
 
 				// Check for listener beans and register them.
@@ -823,6 +823,11 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 			}
 		}
 		else {
+			/**
+			 * Lifecycle
+			 * 实现了 Lifecycle 接口的Bean可以规范化它的生命周期，
+			 * 可以在IOC容器的启动、停止时，自动触发接口中定义的 start 方法和 stop 方法
+			 */
 			DefaultLifecycleProcessor defaultProcessor = new DefaultLifecycleProcessor();
 			defaultProcessor.setBeanFactory(beanFactory);
 			this.lifecycleProcessor = defaultProcessor;
@@ -932,16 +937,17 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 	 * {@link org.springframework.context.event.ContextRefreshedEvent}.
 	 */
 	protected void finishRefresh() {
-		// Clear context-level resource caches (such as ASM metadata from scanning).
+		// 清除资源缓存(如扫描的ASM元数据)
 		clearResourceCaches();
 
-		// Initialize lifecycle processor for this context.
+		// 初始化生命周期处理器
 		initLifecycleProcessor();
 
-		// Propagate refresh to lifecycle processor first.
+		// 将刷新传播到生命周期处理器
+		//它会从IOC容器中找出所有的 Lifecycle 类型的Bean，遍历回调 start 方法
 		getLifecycleProcessor().onRefresh();
 
-		// Publish the final event.
+		// 发布容器刷新完成的事件，让监听器去回调各自的方法
 		publishEvent(new ContextRefreshedEvent(this));
 
 		// Participate in LiveBeansView MBean, if active.

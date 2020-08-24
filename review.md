@@ -752,6 +752,7 @@
                 
                             // Initialize other special beans in specific context subclasses.
                             // 9. 子类的多态onRefresh
+                            //SpringBoot 扩展的IOC容器中对这个方法进行了真正地实现
                             onRefresh();
                 
                             // Check for listener beans and register them.
@@ -800,6 +801,7 @@
           * (4)把ServletContext,ServletConfig注入到组件中,且将Web的几种作用域注册到 BeanFactory 中。
           * (5)执行beanFactory的后置处理器,里面进行了包扫描等等操作
           * (5)注意执行的org.springframework.context.annotation.ConfigurationClassPostProcessor.postProcessBeanDefinitionRegistry,会加载出所有类信息
+          * (9)实现类在SpringBoot org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext#onRefresh
             
 6. 执行顺序 构造方法->BeanPostProcessor的before方法->@PostConstruct/init-method->InitializingBean的afterPropertiesSet方法->BeanPostProcessor的after方法 
 7. BeanFactoryPostProcessor是在所有的 BeanDefinition 已经被加载，但没有Bean被实例化,可以对 BeanFactory 进行后置处理。BeanDefinitionRegistryPostProcessor  
@@ -810,4 +812,22 @@
 会将这个class封装为 BeanDefinition，最后返回
 9. org.springframework.context.annotation.AnnotationBeanNameGenerator为注解的bean名称生成器,规则为看这些模式注解上是否有  
 显式的声明 value 属性，如果没有则进入下面的 buildDefaultBeanName 方法，它会取类名的全称，之后调 Introspector.decapitalize 方法将首字母转为小写
-                
+10. 循环依赖
+    * 重要集合
+        - singletonObjects：一级缓存，存放完全初始化好的Bean的集合，从这个集合中取出来的Bean可以立马返回
+        - earlySingletonObjects：二级缓存，存放创建好但没有初始化属性的Bean的集合，它用来解决循环依赖
+        - singletonFactories：三级缓存，存放单实例Bean工厂的集合
+        - singletonsCurrentlyInCreation：存放正在被创建的Bean的集合                
+    * 思路
+        - 初始化 Bean 之前，将这个 bean 的 name 放入三级缓存
+        - 创建 Bean 将准备创建的 Bean 放入 singletonsCurrentlyInCreation （正在创建的 Bean ）
+        - createNewInstance 方法执行完后执行 addSingletonFactory，将这个实例化但没有属性赋值的 Bean 放入三级缓存，
+        并从二级缓存中移除,一般情况下初次创建的 bean 不会存在于二级缓存，故该步骤可以简单理解为仅仅是放入了三级缓存而已
+        - 属性赋值&自动注入时，引发关联创建
+        - 关联创建时判断
+            1. 检查“正在被创建的 Bean ”中是否有即将注入的 Bean
+            2. 如果有，检查二级缓存中是否有当前创建好但没有赋值初始化的 Bean
+            3. 如果没有，检查三级缓存中是否有正在创建中的 Bean
+            4. 至此一般会有，将这个 Bean 放入二级缓存，并从三级缓存中移除
+        - 之后 Bean 被成功注入，最后执行 addSingleton，将这个完全创建好的Bean放入一级缓存，从二级缓存和三级缓存移除，
+        并记录已经创建了的单实例Bean    
