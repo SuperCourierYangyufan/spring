@@ -37,6 +37,17 @@ package org.springframework.beans.factory;
  * implement {@link org.springframework.context.Lifecycle} instead which offers
  * a richer model for runtime management and allows for phased startup/shutdown.
  *
+ * 在 BeanFactory 引导期间的单实例bean的初始化阶段结束时触发的回调接口。
+ * 该接口可以由单例bean实现，以便在常规的单例实例化算法之后执行一些初始化，避免意外的早期初始化带来的副作用
+ * （例如，来自 ListableBeanFactory.getBeansOfType 调用）。
+ * 从这个意义上讲，它是 InitializingBean 的替代方法，后者在bean的本地构造阶段结束时立即触发。
+ * 这个回调变体有点类似于 org.springframework.context.event.ContextRefreshedEvent，
+ * 但是不需要 org.springframework.context.ApplicationListener 的实现，
+ * 不需要在整个上下文层次结构中过滤上下文引用。这也意味着更多对bean包的依赖性最小，
+ * 并且由独立的ListableBeanFactory实现兑现，而不仅仅是在 ApplicationContext 环境中。
+ * 注意：如果要启动/管理异步任务，则最好实现 org.springframework.context.Lifecycle，它为运行时管理提供了更丰富的模型，
+ * 并允许分阶段启动/关闭。
+ *
  * @author Juergen Hoeller
  * @since 4.1
  * @see org.springframework.beans.factory.config.ConfigurableListableBeanFactory#preInstantiateSingletons()

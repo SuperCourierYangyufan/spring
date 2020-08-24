@@ -16,26 +16,15 @@
 
 package org.springframework.beans.factory.support;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-
-import org.springframework.beans.factory.BeanCreationException;
-import org.springframework.beans.factory.BeanCreationNotAllowedException;
-import org.springframework.beans.factory.BeanCurrentlyInCreationException;
-import org.springframework.beans.factory.DisposableBean;
-import org.springframework.beans.factory.ObjectFactory;
+import org.springframework.beans.factory.*;
 import org.springframework.beans.factory.config.SingletonBeanRegistry;
 import org.springframework.core.SimpleAliasRegistry;
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
+
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Generic registry for shared bean instances, implementing the
@@ -209,6 +198,7 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 		synchronized (this.singletonObjects) {
 			//从缓存中取出,为啥要在获取一次可能由于创建其他Bean过程中已经创建了bean并放到了singletonObjects
 			//此时只要从map中获取即可
+			// 先试着从已经加载好的单实例Bean缓存区中获取是否有当前BeanName的Bean，显然没有
 			Object singletonObject = this.singletonObjects.get(beanName);
 			//为空创建单例的object
 			if (singletonObject == null) {
@@ -224,6 +214,7 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 				/**
 				 * 将beanName添加到singletonsCurrentlyInCreation这样一个set集合中
 				 * 表示beanName对应的bean正在创建中
+				 * 标记当前bean
 				 */
 
 				//此时如果有其他的bean依赖了该bean并进行bean的创建，抛出异常
@@ -267,6 +258,7 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 				}
 				if (newSingleton) {
 					//添加缓存
+					// 将这个创建好的Bean放到IOC容器的单实例Bean缓存区中(一级缓存)
 					addSingleton(beanName, singletonObject);
 				}
 			}

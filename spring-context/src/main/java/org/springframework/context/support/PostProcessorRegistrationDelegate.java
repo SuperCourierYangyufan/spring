@@ -243,8 +243,7 @@ final class PostProcessorRegistrationDelegate {
 		int beanProcessorTargetCount = beanFactory.getBeanPostProcessorCount() + 1 + postProcessorNames.length;
 		beanFactory.addBeanPostProcessor(new BeanPostProcessorChecker(beanFactory, beanProcessorTargetCount));
 
-		// Separate between BeanPostProcessors that implement PriorityOrdered,
-		// Ordered, and the rest.
+		// 这次拿的接口类型是BeanPostProcessor，并且创建了更多的List，分别存放不同的PostProcessor
 		List<BeanPostProcessor> priorityOrderedPostProcessors = new ArrayList<>();
 		// 内部的postProcessors 如MergedBeanDefinitionPostProcessor
 		List<BeanPostProcessor> internalPostProcessors = new ArrayList<>();
@@ -254,6 +253,10 @@ final class PostProcessorRegistrationDelegate {
 			if (beanFactory.isTypeMatch(ppName, PriorityOrdered.class)) {
 				BeanPostProcessor pp = beanFactory.getBean(ppName, BeanPostProcessor.class);
 				priorityOrderedPostProcessors.add(pp);
+				// MergedBeanDefinitionPostProcessor类型的后置处理器被单独放在一个集合中，说明该接口比较特殊
+				/**
+				 * 注意它的实现类AutowiredAnnotationBeanPostProcessor
+				 */
 				if (pp instanceof MergedBeanDefinitionPostProcessor) {
 					internalPostProcessors.add(pp);
 				}
@@ -285,6 +288,7 @@ final class PostProcessorRegistrationDelegate {
 		registerBeanPostProcessors(beanFactory, orderedPostProcessors);
 
 		// Now, register all regular BeanPostProcessors.
+		// 注册普通的BeanPostProcessor
 		// 注册自然顺序的BeanPostProcessors
 		List<BeanPostProcessor> nonOrderedPostProcessors = new ArrayList<>();
 		for (String ppName : nonOrderedPostProcessorNames) {
@@ -300,13 +304,18 @@ final class PostProcessorRegistrationDelegate {
 		// 最后 注册内部的MergedBeanDefinitionPostProcessor类型的internalPostProcessors
 		internalPostProcessors.remove(1);
 		sortPostProcessors(internalPostProcessors, beanFactory);
-
+		// 最最后，才注册那些MergedBeanDefinitionPostProcessor
 		registerBeanPostProcessors(beanFactory, internalPostProcessors);
 
 		// Re-register post-processor for detecting inner beans as ApplicationListeners,
 		// moving it to the end of the processor chain (for picking up proxies etc).
 		// 注册用于检测内部bean为ApplicationListeners的ApplicationListenerDetector
 		// 将它移动到处理器链的末尾（用于拾取代理等）
+
+		// 手动加了一个ApplicationListenerDetector，它是一个ApplicationListener的检测器
+		// 这个检测器用于在最后检测IOC容器中的Bean是否为ApplicationListener接口的实现类，如果是，还会有额外的作用
+		// 实际上它并不是手动加，而是重新注册它，让他位于所有后置处理器的最末尾位置
+		//只是保存Bean是否为单实例Bean的信息。这个单实例Bean的机制在前面也提到过，只有单实例Bean才能注册到监听器列表中
 		beanFactory.addBeanPostProcessor(new ApplicationListenerDetector(applicationContext));
 	}
 

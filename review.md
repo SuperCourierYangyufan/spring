@@ -743,7 +743,7 @@
                             registerBeanPostProcessors(beanFactory);
                 
                             // Initialize message source for this context.
-                            // 7. 初始化MessageSource
+                            // 7. 初始化MessageSource（SpringMVC）
                             initMessageSource();
                 
                             // Initialize event multicaster for this context.

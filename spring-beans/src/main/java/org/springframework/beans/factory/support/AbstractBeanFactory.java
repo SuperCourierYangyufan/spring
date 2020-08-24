@@ -16,65 +16,21 @@
 
 package org.springframework.beans.factory.support;
 
-import java.beans.PropertyEditor;
-import java.security.AccessControlContext;
-import java.security.AccessController;
-import java.security.PrivilegedAction;
-import java.security.PrivilegedActionException;
-import java.security.PrivilegedExceptionAction;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
-
-import org.springframework.beans.BeanUtils;
-import org.springframework.beans.BeanWrapper;
-import org.springframework.beans.BeansException;
-import org.springframework.beans.PropertyEditorRegistrar;
-import org.springframework.beans.PropertyEditorRegistry;
-import org.springframework.beans.PropertyEditorRegistrySupport;
-import org.springframework.beans.SimpleTypeConverter;
-import org.springframework.beans.TypeConverter;
-import org.springframework.beans.TypeMismatchException;
-import org.springframework.beans.factory.BeanCreationException;
-import org.springframework.beans.factory.BeanCurrentlyInCreationException;
-import org.springframework.beans.factory.BeanDefinitionStoreException;
-import org.springframework.beans.factory.BeanFactory;
-import org.springframework.beans.factory.BeanFactoryUtils;
-import org.springframework.beans.factory.BeanIsAbstractException;
-import org.springframework.beans.factory.BeanIsNotAFactoryException;
-import org.springframework.beans.factory.BeanNotOfRequiredTypeException;
-import org.springframework.beans.factory.CannotLoadBeanClassException;
-import org.springframework.beans.factory.FactoryBean;
-import org.springframework.beans.factory.NoSuchBeanDefinitionException;
-import org.springframework.beans.factory.SmartFactoryBean;
-import org.springframework.beans.factory.config.BeanDefinition;
-import org.springframework.beans.factory.config.BeanDefinitionHolder;
-import org.springframework.beans.factory.config.BeanExpressionContext;
-import org.springframework.beans.factory.config.BeanExpressionResolver;
-import org.springframework.beans.factory.config.BeanPostProcessor;
-import org.springframework.beans.factory.config.ConfigurableBeanFactory;
-import org.springframework.beans.factory.config.DestructionAwareBeanPostProcessor;
-import org.springframework.beans.factory.config.InstantiationAwareBeanPostProcessor;
-import org.springframework.beans.factory.config.Scope;
+import org.springframework.beans.*;
+import org.springframework.beans.factory.*;
+import org.springframework.beans.factory.config.*;
 import org.springframework.core.DecoratingClassLoader;
 import org.springframework.core.NamedThreadLocal;
 import org.springframework.core.ResolvableType;
 import org.springframework.core.convert.ConversionService;
 import org.springframework.lang.Nullable;
-import org.springframework.util.Assert;
-import org.springframework.util.ClassUtils;
-import org.springframework.util.ObjectUtils;
-import org.springframework.util.StringUtils;
-import org.springframework.util.StringValueResolver;
+import org.springframework.util.*;
+
+import java.beans.PropertyEditor;
+import java.security.*;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Abstract base class for {@link org.springframework.beans.factory.BeanFactory}
@@ -253,6 +209,8 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 		 */
 
 		//处理bean名称,如果传递过来的是beanFactor则去除"&",如果是别名则转换为beanName
+		//BeanName的映射，getBean时可以传入bean的别名，此处可以根据别名找到BeanName
+		//发现它就是拿aliasMap去一个个的取，找别名映射的BeanName，找不到就返回原始名
 		final String beanName = transformedBeanName(name);
 		Object bean;
 
@@ -271,13 +229,6 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 		 * 之后再来断点，这样就确保了我们是在获取这个bean的时候调用的
 		 *
 		 * 需要说明的是在初始化时候调用一般都是返回null
-		 *
-		 *
-		 *
-		 *
-		 *
-		 *
-		 * lazy
 		 */
 
 		//直接尝试从缓存获取或者singleFactories中的ObjectFactory中获取
@@ -312,6 +263,7 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 			 * 如果是原型不应该在初始化的时候创建
 			 */
 			//原型模式的循环依赖不予解决
+			// 如果搜不到，但该Bean正在被创建，说明产生了循环引用且无法处理，只能抛出异常
 			if (isPrototypeCurrentlyInCreation(beanName)) {
 				throw new BeanCurrentlyInCreationException(beanName);
 			}
@@ -319,9 +271,11 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 			// 如果当前beandefinitionMap不存在beanName的bean并且parentBeanFactory不为null
 			//尝试从parentBeanFactory中创建
 			// Check if bean definition exists in this factory.
+			// 检查这个Bean对应的BeanDefinition在IOC容器中是否存在
 			BeanFactory parentBeanFactory = getParentBeanFactory();
 			if (parentBeanFactory != null && !containsBeanDefinition(beanName)) {
 				// Not found -> check parent.
+				// 如果检查不存在，看看父容器有没有（Web环境会存在父子容器现象）
 				String nameToLookup = originalBeanName(name);
 				if (parentBeanFactory instanceof AbstractBeanFactory) {
 					return ((AbstractBeanFactory) parentBeanFactory).doGetBean(
@@ -338,6 +292,9 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 			}
 
 			//如果不是做类型检查,标记bean正在创建中,通常没啥卵用
+
+			// 走到这个地方，证明Bean确实要被创建了，标记Bean被创建
+			// 该设计是防止多线程同时到这里，引发多次创建的问题
 			if (!typeCheckOnly) {
 				//添加到alreadyCreated set集合当中，表示他已经创建过一场
 				markBeanAsCreated(beanName);
@@ -351,6 +308,11 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 
 				// Guarantee initialization of beans that the current bean depends on.
 				//保证当前bean依赖的bean的初始化
+
+				// 处理当前bean的bean依赖（@DependsOn注解的依赖）
+				// 在创建一个Bean之前，可能这个Bean需要依赖其他的Bean。
+				// 通过这个步骤，可以先递归的将这个Bean显式声明的需要的其他Bean先创建出来。
+				// 通过bean标签的depends-on属性或@DependsOn注解进行显式声明。
 				String[] dependsOn = mbd.getDependsOn();
 				if (dependsOn != null) {
 					for (String dep : dependsOn) {
@@ -372,7 +334,9 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 
 				// Create bean instance.
 				// 创建bean实例.
+				// 作用域为singleton，单实例Bean，创建
 				if (mbd.isSingleton()) {
+					// 匿名内部类执行完成后的getSingleton调用
 					sharedInstance = getSingleton(beanName, () -> {
 						try {
 							//创建bean开始
