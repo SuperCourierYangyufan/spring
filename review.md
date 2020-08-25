@@ -802,6 +802,7 @@
           * (5)执行beanFactory的后置处理器,里面进行了包扫描等等操作
           * (5)注意执行的org.springframework.context.annotation.ConfigurationClassPostProcessor.postProcessBeanDefinitionRegistry,会加载出所有类信息
           * (9)实现类在SpringBoot org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext#onRefresh
+          * (9)
             
 6. 执行顺序 构造方法->BeanPostProcessor的before方法->@PostConstruct/init-method->InitializingBean的afterPropertiesSet方法->BeanPostProcessor的after方法 
 7. BeanFactoryPostProcessor是在所有的 BeanDefinition 已经被加载，但没有Bean被实例化,可以对 BeanFactory 进行后置处理。BeanDefinitionRegistryPostProcessor  
