@@ -1806,6 +1806,7 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 			//第八次后置处理器
 			// 后置处理器在做初始化之后的处理
 			//执行后置处理器的after方法
+			//AOP执行
 			wrappedBean = applyBeanPostProcessorsAfterInitialization(wrappedBean, beanName);
 		}
 

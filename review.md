@@ -863,4 +863,9 @@
     * AnnotationAwareAspectJAutoProxyCreator扩展了InstantiationAwareBeanPostProcessor接口,而其它用于组件的创建前后做后置处理
     * createBean第一次执行后置处理器AbstractAutoProxyCreator(AspectJAwareAdvisorAutoProxyCreator)
     * 后置处理器里面本质上是创建动态代理的配置类,默认单例返回为空.里面就仅仅根据@aspect生成代理增强器放入IOC
-    
+    * 进入doCreateBean->initializeBean ->applyBeanPostProcessorsAfterInitialization 又回到AbstractAutoProxyCreator里进行正真代理
+    * 后置处理器中先获取所有增加器,然后筛选出可用的,在加个ExposeInvocationInterceptor 类型的增强器
+    * 创建代理工厂,将增加的代理器组合成一个增加器，放入工厂中
+    * 然后判断如果目标对象有接口，用jdk动态代理；没有接口，用cglib动态代理。
+    * jdk通过Proxy.newProxyInstance实现动态代理
+9. JDK目标方法执行JdkDynamicAopProxy
