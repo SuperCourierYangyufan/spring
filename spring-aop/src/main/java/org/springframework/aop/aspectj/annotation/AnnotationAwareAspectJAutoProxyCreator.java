@@ -16,16 +16,16 @@
 
 package org.springframework.aop.aspectj.annotation;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.regex.Pattern;
-
 import org.springframework.aop.Advisor;
 import org.springframework.aop.aspectj.autoproxy.AspectJAwareAdvisorAutoProxyCreator;
 import org.springframework.beans.factory.ListableBeanFactory;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Pattern;
 
 /**
  * {@link AspectJAwareAdvisorAutoProxyCreator} subclass that processes all AspectJ
@@ -45,6 +45,14 @@ import org.springframework.util.Assert;
  * @author Juergen Hoeller
  * @since 2.0
  * @see org.springframework.aop.aspectj.annotation.AspectJAdvisorFactory
+ *
+ * AspectJAwareAdvisorAutoProxyCreator子类，用于处理当前应用程序上下文中的所有 @AspectJ 注解的切面，以及Spring的Advisor。
+ *
+ * 如果Spring AOP的基于代理的模型能够应用任何被 @AspectJ 注解标注的类，那么它们的增强方法将被自动识别。这涵盖了方法执行的切入点表达式。
+ *
+ * 如果使用<aop:include>元素，则只有名称与包含模式匹配的被 @AspectJ 标注的Bean将被视为定义要用于Spring自动代理的方面。
+ *
+ * Spring Advisor的处理遵循 AbstractAdvisorAutoProxyCreator 中建立的规则。
  */
 @SuppressWarnings("serial")
 public class AnnotationAwareAspectJAutoProxyCreator extends AspectJAwareAdvisorAutoProxyCreator {
@@ -89,8 +97,10 @@ public class AnnotationAwareAspectJAutoProxyCreator extends AspectJAwareAdvisorA
 	@Override
 	protected List<Advisor> findCandidateAdvisors() {
 		// Add all the Spring advisors found according to superclass rules.
+		// 添加所有根据父类的规则找到的Spring的增强器创建出来,放入IOC容器
 		List<Advisor> advisors = super.findCandidateAdvisors();
 		// Build Advisors for all AspectJ aspects in the bean factory.
+		// 给所有BeanFactory中的AspectJ切面构建增强器
 		if (this.aspectJAdvisorsBuilder != null) {
 			advisors.addAll(this.aspectJAdvisorsBuilder.buildAspectJAdvisors());
 		}
@@ -107,6 +117,11 @@ public class AnnotationAwareAspectJAutoProxyCreator extends AspectJAwareAdvisorA
 		// proxied by that interface and fail at runtime as the advice method is not
 		// defined on the interface. We could potentially relax the restriction about
 		// not advising aspects in the future.
+		//以前我们在构造函数中有 setProxyTargetClass(true)，但是影响范围太广。
+		// 相反，我们现在重写 isInfrastructureClass 方法，以避免代理切面。我
+		// 对此并不完全满意，因为没有充分的理由不增强那些切面，只是它会导致增强方法只能通过代理调用，
+		// 并且如果方面实现了例如 Ordered 接口，它将被该接口代理并在以下位置失败运行时
+		// ，因为未在切面上定义增强方法。我们将来可能会放宽对非增强切面的限制。
 		return (super.isInfrastructureClass(beanClass) ||
 				(this.aspectJAdvisorFactory != null && this.aspectJAdvisorFactory.isAspect(beanClass)));
 	}

@@ -16,20 +16,9 @@
 
 package org.springframework.aop.framework.autoproxy;
 
-import java.beans.PropertyDescriptor;
-import java.lang.reflect.Constructor;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-
 import org.aopalliance.aop.Advice;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 import org.springframework.aop.Advisor;
 import org.springframework.aop.Pointcut;
 import org.springframework.aop.TargetSource;
@@ -50,6 +39,11 @@ import org.springframework.beans.factory.config.SmartInstantiationAwareBeanPostP
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
+
+import java.beans.PropertyDescriptor;
+import java.lang.reflect.Constructor;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * {@link org.springframework.beans.factory.config.BeanPostProcessor} implementation
@@ -245,21 +239,26 @@ public abstract class AbstractAutoProxyCreator extends ProxyProcessorSupport
 
 	@Override
 	public Object postProcessBeforeInstantiation(Class<?> beanClass, String beanName) throws BeansException {
+		// 缓存机制
 		Object cacheKey = getCacheKey(beanClass, beanName);
 
 		if (!StringUtils.hasLength(beanName) || !this.targetSourcedBeans.contains(beanName)) {
+			// 判断该Bean是否已经被增强（advisedBeans为已经增强过的Bean）
 			if (this.advisedBeans.containsKey(cacheKey)) {
 				return null;
 			}
+			//判断是否为基础类型（isInfrastructureClass），或者需要跳过的Bean
+			//isInfrastructureClass(beanClass)进去就是判断类上面是否有@Aspect 注解
+			//shouldSkip(beanClass, beanName) 判断是否有@Aspect注解的类,若有根据该类生成增强器放入IOC
 			if (isInfrastructureClass(beanClass) || shouldSkip(beanClass, beanName)) {
 				this.advisedBeans.put(cacheKey, Boolean.FALSE);
 				return null;
 			}
 		}
 
-		// Create proxy here if we have a custom TargetSource.
-		// Suppresses unnecessary default instantiation of the target bean:
-		// The TargetSource will handle target instances in a custom fashion.
+		// 如果我们有一个自定义的TargetSource，则在此处创建代理。
+		// 这段源码要抑制目标bean的不必要的默认实例化：TargetSource将以自定义方式处理目标实例。
+		// 自定义目标资源，对于单实例Bean必定会返回null
 		TargetSource targetSource = getCustomTargetSource(beanClass, beanName);
 		if (targetSource != null) {
 			if (StringUtils.hasLength(beanName)) {
@@ -375,6 +374,7 @@ public abstract class AbstractAutoProxyCreator extends ProxyProcessorSupport
 	 * @see #shouldSkip
 	 */
 	protected boolean isInfrastructureClass(Class<?> beanClass) {
+		//子类重写了,子类就是@EnableAspectJAutoProxy中@Import(AspectJAutoProxyRegistrar.class)创建出AnnotationAwareAspectJAutoProxyCreator
 		boolean retVal = Advice.class.isAssignableFrom(beanClass) ||
 				Pointcut.class.isAssignableFrom(beanClass) ||
 				Advisor.class.isAssignableFrom(beanClass) ||
@@ -412,6 +412,7 @@ public abstract class AbstractAutoProxyCreator extends ProxyProcessorSupport
 	protected TargetSource getCustomTargetSource(Class<?> beanClass, String beanName) {
 		// We can't create fancy target sources for directly registered singletons.
 		if (this.customTargetSourceCreators != null &&
+				//判断IOC是否含有bean,本来就是给单实例Bean创建代理对象，结果要先从IOC容器中找现在有没有了，那自然没有，直接返回null
 				this.beanFactory != null && this.beanFactory.containsBean(beanName)) {
 			for (TargetSourceCreator tsc : this.customTargetSourceCreators) {
 				TargetSource ts = tsc.getTargetSource(beanClass, beanName);

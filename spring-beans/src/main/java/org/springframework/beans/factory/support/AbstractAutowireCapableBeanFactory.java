@@ -459,8 +459,9 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 			// 所以这个返回值可以用来代替原本该生成的目标对象的实例(一般都是代理对象)。
 			// 如果该方法的返回值代替原本该生成的目标对象，后续只有postProcessAfterInitialization方法会调用，
 			// 其它方法不再调用；否则按照正常的流程走
-
 			// 这个步骤是确保可以创建的是被增强的代理对象而不是原始对象（AOP）
+
+			//本质上是创建动态代理的配置类,默认单例返回为空,里面就仅仅根据@aspect生成代理增强器放入IOC
 			Object bean = resolveBeforeInstantiation(beanName, mbdToUse);
 			if (bean != null) {
 				//如果动态代理创建完毕，将直接返回该Bean

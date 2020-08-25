@@ -696,7 +696,16 @@
                prepareContext(context, environment, listeners, applicationArguments, printedBanner);
                // 4.10 bean的生命流程,刷新容器,最重要
                refreshContext(context);
+              // 4.11 刷新后的处理
                afterRefresh(context, applicationArguments);
+               stopWatch.stop();
+               if (this.logStartupInfo) {
+                   new StartupInfoLogger(this.mainApplicationClass).logStarted(getApplicationLog(), stopWatch);
+               }
+               // 4.12 发布started事件
+               listeners.started(context);
+               // 4.13 运行器回调
+               callRunners(context, applicationArguments);
             }
         ```
         * (4.1)new 一个StopWatch用于统计run启动过程花了多少时间
@@ -795,25 +804,42 @@
                     }
                 }
             ``` 
-          * (1)其中initPropertySources()虽然为空方法,但是在servlet环境下有实现,会把web.xml等信息放入IOC
-          * (3)BeanPostProcessor它通常被称为 “Bean的后置处理器“它可以在对象实例化但初始化之前，以及初始化之后进行一些后置处理
-          * (4)org.springframework.boot.web.servlet.context.AnnotationConfigServletWebServerApplicationContext#postProcessBeanFactory为实现类
-          * (4)把ServletContext,ServletConfig注入到组件中,且将Web的几种作用域注册到 BeanFactory 中。
-          * (5)执行beanFactory的后置处理器,里面进行了包扫描等等操作
-          * (5)注意执行的org.springframework.context.annotation.ConfigurationClassPostProcessor.postProcessBeanDefinitionRegistry,会加载出所有类信息
-          * (9)实现类在SpringBoot org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext#onRefresh
-          * (9)
+            * (1)其中initPropertySources()虽然为空方法,但是在servlet环境下有实现,会把web.xml等信息放入IOC
+            * (3)BeanPostProcessor它通常被称为 “Bean的后置处理器“它可以在对象实例化但初始化之前，以及初始化之后进行一些后置处理
+            * (4)org.springframework.boot.web.servlet.context.AnnotationConfigServletWebServerApplicationContext#postProcessBeanFactory为实现类
+            * (4)把ServletContext,ServletConfig注入到组件中,且将Web的几种作用域注册到 BeanFactory 中。
+            * (5)执行beanFactory的后置处理器,里面进行了包扫描等等操作
+            * (5)注意执行的org.springframework.context.annotation.ConfigurationClassPostProcessor.postProcessBeanDefinitionRegistry,会加载出所有类信息
+            * (9)实现类在SpringBoot org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext#onRefresh
+            * (9)在这里创建了Tomcat
+            * (12)ServletWebServerApplicationContext 还重写了 finishRefresh 方法,调用了 WebServer 的start方法真正启动嵌入式Web容器
             
-6. 执行顺序 构造方法->BeanPostProcessor的before方法->@PostConstruct/init-method->InitializingBean的afterPropertiesSet方法->BeanPostProcessor的after方法 
-7. BeanFactoryPostProcessor是在所有的 BeanDefinition 已经被加载，但没有Bean被实例化,可以对 BeanFactory 进行后置处理。BeanDefinitionRegistryPostProcessor  
-它的执行时机是所有Bean的定义信息即将被加载但未实例化时，也就是先于 BeanFactoryPostProcessor;总结就是【规律】BeanPostProcessor 是对Bean的后置处理，BeanFactoryPostProcessor   
-是对 BeanFactory 的后置处理
-8. spring会把classPath下所有class文件解析出来,然后使用类加载器，把传入的根包以Resource的形式加载出来,然后通过一个MetadataReader来解析.class文件，  
-它就可以读取这个class的类定义信息、注解标注信息。之后要用 MetadataReader 来判断这个class是否为一个 Component,判定为 Component 后，  
-会将这个class封装为 BeanDefinition，最后返回
-9. org.springframework.context.annotation.AnnotationBeanNameGenerator为注解的bean名称生成器,规则为看这些模式注解上是否有  
-显式的声明 value 属性，如果没有则进入下面的 buildDefaultBeanName 方法，它会取类名的全称，之后调 Introspector.decapitalize 方法将首字母转为小写
-10. 循环依赖
+6. IOC小结
+    * 执行顺序 构造方法->BeanPostProcessor的before方法->@PostConstruct/init-method->InitializingBean的afterPropertiesSet方法->BeanPostProcessor的after方法 
+    * BeanFactoryPostProcessor是在所有的 BeanDefinition 已经被加载，但没有Bean被实例化,可以对 BeanFactory 进行后置处理。BeanDefinitionRegistryPostProcessor  
+    它的执行时机是所有Bean的定义信息即将被加载但未实例化时，也就是先于 BeanFactoryPostProcessor;总结就是【规律】BeanPostProcessor 是对Bean的后置处理，BeanFactoryPostProcessor   
+    是对 BeanFactory 的后置处理
+    * spring会把classPath下所有class文件解析出来,然后使用类加载器，把传入的根包以Resource的形式加载出来,然后通过一个MetadataReader来解析.class文件，  
+    它就可以读取这个class的类定义信息、注解标注信息。之后要用 MetadataReader 来判断这个class是否为一个 Component,判定为 Component 后，  
+    会将这个class封装为 BeanDefinition，最后返回
+    * org.springframework.context.annotation.AnnotationBeanNameGenerator为注解的bean名称生成器,规则为看这些模式注解上是否有  
+    显式的声明 value 属性，如果没有则进入下面的 buildDefaultBeanName 方法，它会取类名的全称，之后调 Introspector.decapitalize 方法将首字母转为小写
+    * SpringBoot 会根据classpath下存在的类，决定当前应用的类型，以此来创建合适的IOC容器。默认WebMvc环境下，创建的IOC容器是 AnnotationConfigServletWebServerApplicationContext
+    * SpringBoot 使用 SpringFactoriesLoader.loadFactoryNames 机制来从 META-INF/spring.factories 文件中读取指定 类/注解 映射的组件全限定类名，  
+    以此来反射创建组件。Spring设计的SPI比Java原生的SPI要更灵活，因为它的key可以任意定义类/注解，不再局限于“接口-实现类”的形式
+    * SpringApplicationRunListener 可以监听 SpringApplication 的运行方法。通过注册 SpringApplicationRunListener ，  
+    可以自定义的在 SpringBoot 应用启动过程、运行、销毁时监听对应的事件，来执行自定义逻辑
+    * Spring应用的IOC容器需要依赖 Environment - 运行环境，它用来表示整个Spring应用运行时的环境，它分为 profiles 和 properties 两个部分。  
+    通过配置不同的 profile ，可以支持配置的灵活切换，并且可以同时配置一到多个 profile 来共同配置 Environment
+    * 后置处理器
+        - BeanPostProcessor：Bean实例化后，初始化的前后触发
+        - BeanDefinitionRegistryPostProcessor：所有Bean的定义信息即将被加载但未实例化时触发
+        - BeanFactoryPostProcessor：所有的 BeanDefinition 已经被加载，但没有Bean被实例化时触发
+        - InstantiationAwareBeanPostProcessor：Bean的实例化对象的前后过程、以及实例的属性设置（AOP）
+        - InitDestroyAnnotationBeanPostProcessor：触发执行Bean中标注 @PostConstruct 、@PreDestroy 注解的方法
+        - ConfigurationClassPostProcessor：解析加了 @Configuration 的配置类，解析 @ComponentScan 注解扫描的包，以及解析 @Import 、@ImportResource 等注解
+        - AutowiredAnnotationBeanPostProcessor：负责处理 @Autowired 、@Value 等注解
+7. 循环依赖
     * 重要集合
         - singletonObjects：一级缓存，存放完全初始化好的Bean的集合，从这个集合中取出来的Bean可以立马返回
         - earlySingletonObjects：二级缓存，存放创建好但没有初始化属性的Bean的集合，它用来解决循环依赖
@@ -832,3 +858,9 @@
             4. 至此一般会有，将这个 Bean 放入二级缓存，并从三级缓存中移除
         - 之后 Bean 被成功注入，最后执行 addSingleton，将这个完全创建好的Bean放入一级缓存，从二级缓存和三级缓存移除，
         并记录已经创建了的单实例Bean    
+8. AOP
+    * 通过@EnableAspectJAutoProxy中@Import(AspectJAutoProxyRegistrar.class)创建出AnnotationAwareAspectJAutoProxyCreator
+    * AnnotationAwareAspectJAutoProxyCreator扩展了InstantiationAwareBeanPostProcessor接口,而其它用于组件的创建前后做后置处理
+    * createBean第一次执行后置处理器AbstractAutoProxyCreator(AspectJAwareAdvisorAutoProxyCreator)
+    * 后置处理器里面本质上是创建动态代理的配置类,默认单例返回为空.里面就仅仅根据@aspect生成代理增强器放入IOC
+    
