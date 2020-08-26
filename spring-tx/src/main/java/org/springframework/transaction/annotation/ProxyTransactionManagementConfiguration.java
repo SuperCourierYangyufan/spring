@@ -35,11 +35,16 @@ import org.springframework.transaction.interceptor.TransactionInterceptor;
  * @see TransactionManagementConfigurationSelector
  */
 @Configuration
+//先初始化父类
+//创建bean TransactionalEventListenerFactory 进行事务监听
 public class ProxyTransactionManagementConfiguration extends AbstractTransactionManagementConfiguration {
 
+	//由 TransactionAttributeSource 驱动的增强器，用于为开启事务的Bean的方法附加事务通知
 	@Bean(name = TransactionManagementConfigUtils.TRANSACTION_ADVISOR_BEAN_NAME)
 	@Role(BeanDefinition.ROLE_INFRASTRUCTURE)
 	public BeanFactoryTransactionAttributeSourceAdvisor transactionAdvisor() {
+		//Advisor → → →依赖→ → → Pointcut → → →依赖→ → → Source
+		//它是利用切入点来增强方法 （源码中看到了pointcut）。源码中的pointcut属性的创建又要借助 TransactionAttributeSource
 		BeanFactoryTransactionAttributeSourceAdvisor advisor = new BeanFactoryTransactionAttributeSourceAdvisor();
 		advisor.setTransactionAttributeSource(transactionAttributeSource());
 		advisor.setAdvice(transactionInterceptor());
@@ -52,12 +57,14 @@ public class ProxyTransactionManagementConfiguration extends AbstractTransaction
 	@Bean
 	@Role(BeanDefinition.ROLE_INFRASTRUCTURE)
 	public TransactionAttributeSource transactionAttributeSource() {
+		//解析 @Transactional 注解的信息,如传播行为,隔离级别，回滚异常等等
 		return new AnnotationTransactionAttributeSource();
 	}
 
 	@Bean
 	@Role(BeanDefinition.ROLE_INFRASTRUCTURE)
 	public TransactionInterceptor transactionInterceptor() {
+		//实现了MethodInterceptor ！它也是一个AOP的增强器。那它的核心作用大概率就是控制事务
 		TransactionInterceptor interceptor = new TransactionInterceptor();
 		interceptor.setTransactionAttributeSource(transactionAttributeSource());
 		if (this.txManager != null) {

@@ -16,12 +16,12 @@
 
 package org.springframework.transaction.interceptor;
 
-import java.io.Serializable;
-import java.lang.reflect.Method;
-
 import org.springframework.aop.support.StaticMethodMatcherPointcut;
 import org.springframework.lang.Nullable;
 import org.springframework.util.ObjectUtils;
+
+import java.io.Serializable;
+import java.lang.reflect.Method;
 
 /**
  * Inner class that implements a Pointcut that matches if the underlying
@@ -34,10 +34,13 @@ import org.springframework.util.ObjectUtils;
 abstract class TransactionAttributeSourcePointcut extends StaticMethodMatcherPointcut implements Serializable {
 
 	@Override
+	//它实现了 ClassFilter 接口
+	//是否为 TransactionalProxy 、PlatformTransactionManager 、PersistenceExceptionTranslator 的实现类
 	public boolean matches(Method method, @Nullable Class<?> targetClass) {
 		if (targetClass != null && TransactionalProxy.class.isAssignableFrom(targetClass)) {
 			return false;
 		}
+		//让 TransactionAttributeSource 获取事务属性看是否为空
 		TransactionAttributeSource tas = getTransactionAttributeSource();
 		return (tas == null || tas.getTransactionAttribute(method, targetClass) != null);
 	}

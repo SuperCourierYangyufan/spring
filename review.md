@@ -872,3 +872,23 @@
     * jdk动态代理借助接口实现，并且在创建代理对象之前还注入了额外的接口
     * 核心思想都是获取增强器调用链，然后链式执行增强器（拦截器）
     * 执行拦截器链时，为保证拦截器链能有序执行，会引入下标索引机制
+10. 事务
+    * 执行流程
+        - @EnableTransactionManagementz组件@Import最后默认创建AutoProxyRegistrar,ProxyTransactionManagementConfiguration
+        - AutoProxyRegistrar在调用beanFactoryPostProcessors时通过后置处理器(postProcessBeanDefinitionRegistry)读取出来
+        - AutoProxyRegistrar里面生成创建InfrastructureAdvisorAutoProxyCreator
+        - InfrastructureAdvisorAutoProxyCreator得父类也是AbstractAdvisorAutoProxyCreator(AOP得父类),所以实现也一样
+        - ProxyTransactionManagementConfiguration注册了多个组件，用来生成事务增强器、事务切入点解析器、事务配置源、事务拦截器等组件  
+        - 本质上还是经过动态代理得到JdkDynamicAopProxy,然后invoke,里面通过try{时间执行}catch{回滚}finally{清除缓存}提交
+    * 事务传播行为原理
+        1. 7种类型
+            - PROPAGATION_REQUIRED:【默认值：必需】当前方法必须在事务中运行，如果当前线程中没有事务，则开启一个新的事务；
+            如果当前线程中已经存在事务，则方法将会在该事务中运行。
+            - PROPAGATION_SUPPORTS:【支持】当前方法单独运行时不需要事务，但如果当前线程中存在事务时，方法会在事务中运行
+            - PROPAGATION_MANDATORY:【强制】当前方法必须在事务中运行，如果当前线程中不存在事务，则抛出异常
+            - PROPAGATION_REQUIRES_NEW:【新事务】当前方法必须在独立的事务中运行，如果当前线程中已经存在事务，则将该事务挂起，
+            重新开启一个事务，直到方法运行结束再释放之前的事务
+            - PROPAGATION_NOT_SUPPORTED:【不支持】当前方法不会在事务中运行，如果当前线程中存在事务，则将事务挂起，直到方法运行结束
+            - PROPAGATION_NEVER:【不允许】当前方法不允许在事务中运行，如果当前线程中存在事务，则抛出异常
+            - PROPAGATION_NESTED:【嵌套】当前方法必须在事务中运行，如果当前线程中存在事务，则将该事务标注保存点，形成嵌套事务。
+            嵌套事务中的子事务出现异常不会影响到父事务保存点之前的操作。

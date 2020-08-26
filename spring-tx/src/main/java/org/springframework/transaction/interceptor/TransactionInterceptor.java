@@ -16,19 +16,18 @@
 
 package org.springframework.transaction.interceptor;
 
+import org.aopalliance.intercept.MethodInterceptor;
+import org.aopalliance.intercept.MethodInvocation;
+import org.springframework.aop.support.AopUtils;
+import org.springframework.beans.factory.BeanFactory;
+import org.springframework.lang.Nullable;
+import org.springframework.transaction.PlatformTransactionManager;
+
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.Properties;
-
-import org.aopalliance.intercept.MethodInterceptor;
-import org.aopalliance.intercept.MethodInvocation;
-
-import org.springframework.aop.support.AopUtils;
-import org.springframework.beans.factory.BeanFactory;
-import org.springframework.lang.Nullable;
-import org.springframework.transaction.PlatformTransactionManager;
 
 /**
  * AOP Alliance MethodInterceptor for declarative transaction
@@ -88,13 +87,15 @@ public class TransactionInterceptor extends TransactionAspectSupport implements 
 
 	@Override
 	@Nullable
+	//首先做一次目标方法执行的空校验，AopUtils.getTargetClass() 是为了获取被代理的目标类，
+	// 之后执行 invokeWithinTransaction 方法，套用事
 	public Object invoke(MethodInvocation invocation) throws Throwable {
 		// Work out the target class: may be {@code null}.
 		// The TransactionAttributeSource should be passed the target class
 		// as well as the method, which may be from an interface.
 		Class<?> targetClass = (invocation.getThis() != null ? AopUtils.getTargetClass(invocation.getThis()) : null);
 
-		// Adapt to TransactionAspectSupport's invokeWithinTransaction...
+		//真正执行事务
 		return invokeWithinTransaction(invocation.getMethod(), targetClass, invocation::proceed);
 	}
 

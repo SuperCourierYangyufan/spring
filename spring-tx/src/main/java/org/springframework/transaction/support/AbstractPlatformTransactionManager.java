@@ -16,25 +16,16 @@
 
 package org.springframework.transaction.support;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.springframework.core.Constants;
+import org.springframework.lang.Nullable;
+import org.springframework.transaction.*;
+
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.Serializable;
 import java.util.List;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
-import org.springframework.core.Constants;
-import org.springframework.lang.Nullable;
-import org.springframework.transaction.IllegalTransactionStateException;
-import org.springframework.transaction.InvalidTimeoutException;
-import org.springframework.transaction.NestedTransactionNotSupportedException;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.TransactionDefinition;
-import org.springframework.transaction.TransactionException;
-import org.springframework.transaction.TransactionStatus;
-import org.springframework.transaction.TransactionSuspensionNotSupportedException;
-import org.springframework.transaction.UnexpectedRollbackException;
 
 /**
  * Abstract base class that implements Spring's standard transaction workflow,
@@ -693,7 +684,7 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
 			throw new IllegalTransactionStateException(
 					"Transaction is already completed - do not call commit or rollback more than once per transaction");
 		}
-
+		// 校验事务状态，如果在事务链中已经有操作将当前事务标记为 “需要回滚” ，则直接回滚事务
 		DefaultTransactionStatus defStatus = (DefaultTransactionStatus) status;
 		if (defStatus.isLocalRollbackOnly()) {
 			if (defStatus.isDebug()) {
@@ -710,7 +701,7 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
 			processRollback(defStatus, true);
 			return;
 		}
-
+		// 没有异常标记，提交事务
 		processCommit(defStatus);
 	}
 
@@ -730,19 +721,22 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
 				triggerBeforeCommit(status);
 				triggerBeforeCompletion(status);
 				beforeCompletionInvoked = true;
-
+				// 是否有保存点
 				if (status.hasSavepoint()) {
 					if (status.isDebug()) {
 						logger.debug("Releasing transaction savepoint");
 					}
 					unexpectedRollback = status.isGlobalRollbackOnly();
+					// 保存点不会真正提交事务
 					status.releaseHeldSavepoint();
 				}
+				// 全新的事务会执行commit操作（与事务传播行为有关）
 				else if (status.isNewTransaction()) {
 					if (status.isDebug()) {
 						logger.debug("Initiating transaction commit");
 					}
 					unexpectedRollback = status.isGlobalRollbackOnly();
+					//调用jdbc 提交
 					doCommit(status);
 				}
 				else if (isFailEarlyOnGlobalRollbackOnly()) {
@@ -790,6 +784,7 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
 
 		}
 		finally {
+			// 清除缓存资源
 			cleanupAfterCompletion(status);
 		}
 	}
@@ -802,6 +797,7 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
 	 * @see #doSetRollbackOnly
 	 */
 	@Override
+	//方法中先校验一下事务是否已经完成，之后会执行 processRollback 方法。
 	public final void rollback(TransactionStatus status) throws TransactionException {
 		if (status.isCompleted()) {
 			throw new IllegalTransactionStateException(
@@ -824,17 +820,19 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
 
 			try {
 				triggerBeforeCompletion(status);
-
+				// 如果事务状态中发现了保存点，证明当前事务是NESTD类型（子事务），会回滚到保存点
 				if (status.hasSavepoint()) {
 					if (status.isDebug()) {
 						logger.debug("Rolling back transaction to savepoint");
 					}
 					status.rollbackToHeldSavepoint();
 				}
+				// 全新的事务才会完全回滚
 				else if (status.isNewTransaction()) {
 					if (status.isDebug()) {
 						logger.debug("Initiating transaction rollback");
 					}
+					//回滚
 					doRollback(status);
 				}
 				else {
@@ -875,6 +873,7 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
 			}
 		}
 		finally {
+			// 清除事务缓存
 			cleanupAfterCompletion(status);
 		}
 	}
