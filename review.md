@@ -860,12 +860,13 @@
         并记录已经创建了的单实例Bean    
 8. AOP
     * 通过@EnableAspectJAutoProxy中@Import(AspectJAutoProxyRegistrar.class)创建出AnnotationAwareAspectJAutoProxyCreator
-    * AnnotationAwareAspectJAutoProxyCreator扩展了InstantiationAwareBeanPostProcessor接口,而其它用于组件的创建前后做后置处理
+    * AnnotationAwareAspectJAutoProxyCreator扩展了InstantiationAwareBeanPostProcessor接口,而其可以做组件的 创建前后、初始化前后的后置处理工作
     * createBean第一次执行后置处理器AbstractAutoProxyCreator(AspectJAwareAdvisorAutoProxyCreator)
     * 后置处理器里面本质上是创建动态代理的配置类,默认单例返回为空.里面就仅仅根据@aspect生成代理增强器放入IOC
     * 进入doCreateBean->initializeBean ->applyBeanPostProcessorsAfterInitialization 又回到AbstractAutoProxyCreator里进行正真代理
+    * AOP的核心执行都是执行织入的一组 MethodInterceptor ，AopProxy 类会借助下标索引来保证拦截器有序执行
     * 后置处理器中先获取所有增加器,然后筛选出可用的,在加个ExposeInvocationInterceptor 类型的增强器
-    * 创建代理工厂,将增加的代理器组合成一个增加器，放入工厂中
+    * 创建代理工厂,将增加的代理器组合成一个增加器，放入工厂中,AOP的四种声明式通知注解，最终都会转化为对应的 MethodInterceptor ，并且它们都属于通知
     * 然后判断如果目标对象有接口，用jdk动态代理；没有接口，用cglib动态代理。
     * jdk通过Proxy.newProxyInstance实现动态代理
 9. JDK目标方法执行JdkDynamicAopProxy
@@ -880,15 +881,14 @@
         - InfrastructureAdvisorAutoProxyCreator得父类也是AbstractAdvisorAutoProxyCreator(AOP得父类),所以实现也一样
         - ProxyTransactionManagementConfiguration注册了多个组件，用来生成事务增强器、事务切入点解析器、事务配置源、事务拦截器等组件  
         - 本质上还是经过动态代理得到JdkDynamicAopProxy,然后invoke,里面通过try{时间执行}catch{回滚}finally{清除缓存}提交
-    * 事务传播行为原理
-        1. 7种类型
-            - PROPAGATION_REQUIRED:【默认值：必需】当前方法必须在事务中运行，如果当前线程中没有事务，则开启一个新的事务；
-            如果当前线程中已经存在事务，则方法将会在该事务中运行。
-            - PROPAGATION_SUPPORTS:【支持】当前方法单独运行时不需要事务，但如果当前线程中存在事务时，方法会在事务中运行
-            - PROPAGATION_MANDATORY:【强制】当前方法必须在事务中运行，如果当前线程中不存在事务，则抛出异常
-            - PROPAGATION_REQUIRES_NEW:【新事务】当前方法必须在独立的事务中运行，如果当前线程中已经存在事务，则将该事务挂起，
-            重新开启一个事务，直到方法运行结束再释放之前的事务
-            - PROPAGATION_NOT_SUPPORTED:【不支持】当前方法不会在事务中运行，如果当前线程中存在事务，则将事务挂起，直到方法运行结束
-            - PROPAGATION_NEVER:【不允许】当前方法不允许在事务中运行，如果当前线程中存在事务，则抛出异常
-            - PROPAGATION_NESTED:【嵌套】当前方法必须在事务中运行，如果当前线程中存在事务，则将该事务标注保存点，形成嵌套事务。
-            嵌套事务中的子事务出现异常不会影响到父事务保存点之前的操作。
+    * 事务传播行为原理，7种类型
+         - PROPAGATION_REQUIRED:【默认值：必需】当前方法必须在事务中运行，如果当前线程中没有事务，则开启一个新的事务；
+         如果当前线程中已经存在事务，则方法将会在该事务中运行。
+         - PROPAGATION_SUPPORTS:【支持】当前方法单独运行时不需要事务，但如果当前线程中存在事务时，方法会在事务中运行
+         - PROPAGATION_MANDATORY:【强制】当前方法必须在事务中运行，如果当前线程中不存在事务，则抛出异常
+         - PROPAGATION_REQUIRES_NEW:【新事务】当前方法必须在独立的事务中运行，如果当前线程中已经存在事务，则将该事务挂起，
+         重新开启一个事务，直到方法运行结束再释放之前的事务
+         - PROPAGATION_NOT_SUPPORTED:【不支持】当前方法不会在事务中运行，如果当前线程中存在事务，则将事务挂起，直到方法运行结束
+         - PROPAGATION_NEVER:【不允许】当前方法不允许在事务中运行，如果当前线程中存在事务，则抛出异常
+         - PROPAGATION_NESTED:【嵌套】当前方法必须在事务中运行，如果当前线程中存在事务，则将该事务标注保存点，形成嵌套事务。
+         嵌套事务中的子事务出现异常不会影响到父事务保存点之前的操作。

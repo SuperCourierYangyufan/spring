@@ -144,6 +144,8 @@ public abstract class AbstractTransactionStatus implements TransactionStatus {
 	 * if the underlying transaction does not support savepoints
 	 */
 	public void createAndHoldSavepoint() throws TransactionException {
+		//getSavepointManager 把当前的事务做了一次强转
+		//createSavepoint 原生jdbc的操作：Connection 对象的 setSavepoint 方法
 		setSavepoint(getSavepointManager().createSavepoint());
 	}
 

@@ -16,18 +16,17 @@
 
 package org.springframework.transaction.interceptor;
 
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 import org.springframework.aop.support.AopUtils;
 import org.springframework.core.MethodClassKey;
 import org.springframework.lang.Nullable;
 import org.springframework.util.ClassUtils;
+
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Abstract implementation of {@link TransactionAttributeSource} that caches
@@ -96,6 +95,7 @@ public abstract class AbstractFallbackTransactionAttributeSource implements Tran
 
 		// First, see if we have a cached value.
 		Object cacheKey = getCacheKey(method, targetClass);
+		// 这里取出来的 cached 不是null
 		TransactionAttribute cached = this.attributeCache.get(cacheKey);
 		if (cached != null) {
 			// Value will either be canonical value indicating there is no transaction attribute,
@@ -107,6 +107,9 @@ public abstract class AbstractFallbackTransactionAttributeSource implements Tran
 				return cached;
 			}
 		}
+		//org.springframework.transaction.interceptor.TransactionAttributeSourcePointcut#matches
+		//在第一次事务织入时要获取所有切入点，之后它会搜索所有切入点，判断创建的Bean是否可以被织入事务通知 ，
+		// 在搜索时刚好来到这里要解析事务定义信息，所以会触发解析和缓存动作
 		else {
 			// We need to work it out.
 			TransactionAttribute txAttr = computeTransactionAttribute(method, targetClass);

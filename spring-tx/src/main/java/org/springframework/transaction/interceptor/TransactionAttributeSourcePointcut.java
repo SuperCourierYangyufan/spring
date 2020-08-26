@@ -42,6 +42,7 @@ abstract class TransactionAttributeSourcePointcut extends StaticMethodMatcherPoi
 		}
 		//让 TransactionAttributeSource 获取事务属性看是否为空
 		TransactionAttributeSource tas = getTransactionAttributeSource();
+		//tas.getTransactionAttribute(method, targetClass)已经缓存了所有的切入点
 		return (tas == null || tas.getTransactionAttribute(method, targetClass) != null);
 	}
 
