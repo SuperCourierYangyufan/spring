@@ -670,8 +670,27 @@
             - ViewResolver 渲染视图完成后，返回给 DispatcherServlet，由 DispatcherServlet 负责响应视图 
         * 代码流
             - 进入DispatcherServlet父类HttpServlet的service方法,然后根据请求类型分发到FrameworkServlet的processRequest方法上
-            -   
-         
+            - 将当前线程数据取出传入新封装好的请求参数和上下文,目的是目的是线程隔离
+            - 将IOC容器及特定组件放入request供开发使用,然后缓存一个SessionFlashMapManager,用来保存页面参数缓存
+            - 校验并解析上传的文件,然后根据URL从拿到对应的对应HandlerMethod,其中读取时采用读锁,与上面写锁对应
+            - 获取HandlerMethod进行拦截器处理,来判断是否能够匹配当前请求URL
+            - 然后获取所有适配器来判断那个适配器能处理HandlerMethod返回HandlerAdapter
+            - 执行拦截器(springMVC拦截器功能就在此实现:HandlerIntercepto),如果拦截器返回true，代表继续向后执行剩余的拦截器；如果返回false，  
+            代表拦截器将该方法拦截，不执行后续的拦截器和 Controller 中的方法。
+            - 正式执行HandlerAdapter.handle准备执行逻辑处理
+            - 初始化Controller中一个WebDataBinder,来对这个控制器中的数据绑定器做定制修改。通常情况下我们不会操作WebDataBinder,
+            WebDataBinder它的作用就是从webrequest里绑定到JavaBean上
+            - 寻找不带 @RequestMapping 但带 @ModelAttribute 的方法(进入 Controller 的指定方法之前，标有 @ModelAttribute 注解的方法会先执行)
+            - HandlerMethod 封装为 ServletInvocableHandlerMethod,执行其下invokeAndHandle(实际调用Controller)方法
+            - invokeAndHandle中首先获得方法的所有参数类型,进行判断是否能够转化,能够就保存下来方便后面获取，不行就报错
+            - 然后获取方法参数所有的key,再根据key通过调用原生Api操作获得值,然后再进行转化
+            - 然后反射调用Controller 里的方法。得到的结果寻找一个ReturnValueHandler匹配一个最合适的适配器,页面采用ViewNameMethodReturnValueHandler
+            - 再然后包装一个根据已有信息包装一个ModelAndView 返回
+            - 返回后来判断 header 中是否有 "Cache-Control" 来决定最后的跳转(默认不带,从而只设置一些缓存信息)
+            - 然后回调拦截器(HandlerIntercepto)的postHandle方法
+            - 然后根据ModelAndView判断是否有异常,如果有异常寻找合适的异常处理器返回,若没有则渲染视图
+            - 最后回调拦截器(HandlerIntercepto)的afterConcurrentHandlingStarted方法
+        * @ResponseBody响应json数据的原理:在对Controller结果进行处理时,不采用ViewNameMethodReturnValueHandler，而是使用 RequestResponseBodyMethodProcessor
 5. 启动流程
     1. 创建SpringApplication
         ``` 

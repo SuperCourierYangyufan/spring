@@ -338,6 +338,9 @@ public abstract class AbstractHandlerMapping extends WebApplicationObjectSupport
 	 * @param request current HTTP request
 	 * @return the corresponding handler instance, or the default handler
 	 * @see #getHandlerInternal
+	 *
+	 * 这个方法的第一步就要先根据 uri 获取能处理它的 Handler ，
+	 * 之后拿这个 handler 跟一组拦截器组合形成 HandlerExecutionChain ，最后处理跨域情况
 	 */
 	@Override
 	@Nullable
@@ -356,7 +359,9 @@ public abstract class AbstractHandlerMapping extends WebApplicationObjectSupport
 			handler = obtainApplicationContext().getBean(handlerName);
 		}
 		//获得拦截器链
+		//它会把所有的拦截器都取出来，并且匹配是否为 MappedInterceptor 类型，还要匹配是否能处理当前请求 uri
 		HandlerExecutionChain executionChain = getHandlerExecutionChain(handler, request);
+		//处理跨域
 		if (CorsUtils.isCorsRequest(request)) {
 			CorsConfiguration globalConfig = this.globalCorsConfigSource.getCorsConfiguration(request);
 			CorsConfiguration handlerConfig = getCorsConfiguration(handler, request);

@@ -995,6 +995,7 @@ public class DispatcherServlet extends FrameworkServlet {
 				//mappedHandler.getHandler() 如果是bean返回对象,如果是方法，则返回方法
 				//适配器模式 到这里spring才知到如何反射调用
 				//获取HandlerAdapter
+				//它会找所有的 HandlerAdapter ，来判断谁能处理当前的 handler
 				HandlerAdapter ha = getHandlerAdapter(mappedHandler.getHandler());
 
 				// Process last-modified header, if supported by the handler.
@@ -1022,7 +1023,7 @@ public class DispatcherServlet extends FrameworkServlet {
 				if (asyncManager.isConcurrentHandlingStarted()) {
 					return;
 				}
-
+				// 如果ModelAndView不为空，但viewName为空时，指定默认view的名
 				applyDefaultViewName(processedRequest, mv);
 				// 回调拦截器
 				mappedHandler.applyPostHandle(processedRequest, response, mv);
@@ -1083,7 +1084,7 @@ public class DispatcherServlet extends FrameworkServlet {
 			@Nullable Exception exception) throws Exception {
 
 		boolean errorView = false;
-
+		//如果有抛出异常，则根据异常的类型处理ModelAndView
 		if (exception != null) {
 			if (exception instanceof ModelAndViewDefiningException) {
 				logger.debug("ModelAndViewDefiningException encountered", exception);
@@ -1091,6 +1092,7 @@ public class DispatcherServlet extends FrameworkServlet {
 			}
 			else {
 				Object handler = (mappedHandler != null ? mappedHandler.getHandler() : null);
+				//处理
 				mv = processHandlerException(request, response, handler, exception);
 				errorView = (mv != null);
 			}
@@ -1098,6 +1100,7 @@ public class DispatcherServlet extends FrameworkServlet {
 
 		// Did the handler return a view to render?
 		if (mv != null && !mv.wasCleared()) {
+			//渲染结果视图
 			render(mv, request, response);
 			if (errorView) {
 				WebUtils.clearErrorRequestAttributes(request);
@@ -1269,6 +1272,7 @@ public class DispatcherServlet extends FrameworkServlet {
 				if (logger.isTraceEnabled()) {
 					logger.trace("Testing handler adapter [" + ha + "]");
 				}
+				// 判断是否能处理当前Handler
 				if (ha.supports(handler)) {
 					return ha;
 				}
@@ -1292,7 +1296,7 @@ public class DispatcherServlet extends FrameworkServlet {
 	protected ModelAndView processHandlerException(HttpServletRequest request, HttpServletResponse response,
 			@Nullable Object handler, Exception ex) throws Exception {
 
-		// Check registered HandlerExceptionResolvers...
+		// 遍历所有可以处理异常的异常处理器
 		ModelAndView exMv = null;
 		if (this.handlerExceptionResolvers != null) {
 			for (HandlerExceptionResolver handlerExceptionResolver : this.handlerExceptionResolvers) {
@@ -1302,6 +1306,7 @@ public class DispatcherServlet extends FrameworkServlet {
 				}
 			}
 		}
+		// 如果有成功处理，则返回异常视图
 		if (exMv != null) {
 			if (exMv.isEmpty()) {
 				request.setAttribute(EXCEPTION_ATTRIBUTE, ex);
@@ -1320,7 +1325,7 @@ public class DispatcherServlet extends FrameworkServlet {
 			WebUtils.exposeErrorRequestAttributes(request, ex, getServletName());
 			return exMv;
 		}
-
+// 无法处理该异常，继续抛出
 		throw ex;
 	}
 
@@ -1334,7 +1339,7 @@ public class DispatcherServlet extends FrameworkServlet {
 	 * @throws Exception if there's a problem rendering the view
 	 */
 	protected void render(ModelAndView mv, HttpServletRequest request, HttpServletResponse response) throws Exception {
-		// Determine locale for request and apply it to the response.
+		// 国际化处理
 		Locale locale =
 				(this.localeResolver != null ? this.localeResolver.resolveLocale(request) : request.getLocale());
 		response.setLocale(locale);
@@ -1342,8 +1347,9 @@ public class DispatcherServlet extends FrameworkServlet {
 		View view;
 		String viewName = mv.getViewName();
 		if (viewName != null) {
-			// We need to resolve the view name.
+			//解析viewName获取对应View
 			view = resolveViewName(viewName, mv.getModelInternal(), locale, request);
+			// 如果没有解析到View，则抛出异常
 			if (view == null) {
 				throw new ServletException("Could not resolve view with name '" + mv.getViewName() +
 						"' in servlet with name '" + getServletName() + "'");
@@ -1366,6 +1372,7 @@ public class DispatcherServlet extends FrameworkServlet {
 			if (mv.getStatus() != null) {
 				response.setStatus(mv.getStatus().value());
 			}
+			//带入Model的数据来真正渲染视图
 			view.render(mv.getModelInternal(), request, response);
 		}
 		catch (Exception ex) {
