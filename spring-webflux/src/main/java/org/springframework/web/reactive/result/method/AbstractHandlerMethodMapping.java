@@ -16,21 +16,6 @@
 
 package org.springframework.web.reactive.result.method;
 
-import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
-
-import reactor.core.publisher.Mono;
-
 import org.springframework.aop.support.AopUtils;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.core.MethodIntrospector;
@@ -43,6 +28,12 @@ import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.reactive.HandlerMapping;
 import org.springframework.web.reactive.handler.AbstractHandlerMapping;
 import org.springframework.web.server.ServerWebExchange;
+import reactor.core.publisher.Mono;
+
+import java.lang.reflect.Method;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  * Abstract base class for {@link HandlerMapping} implementations that define
@@ -169,7 +160,9 @@ public abstract class AbstractHandlerMethodMapping<T> extends AbstractHandlerMap
 						logger.debug("Could not resolve target class for bean with name '" + beanName + "'", ex);
 					}
 				}
+				//isHandler判断是否含有Controller或RequestMapping
 				if (beanType != null && isHandler(beanType)) {
+					//解析类中标注了 @RequestMapping 的方法
 					detectHandlerMethods(beanName);
 				}
 			}
@@ -187,11 +180,16 @@ public abstract class AbstractHandlerMethodMapping<T> extends AbstractHandlerMap
 
 		if (handlerType != null) {
 			final Class<?> userType = ClassUtils.getUserClass(handlerType);
+			//解析筛选方法
+			//selectMethods里面回调getMappingForMethod
 			Map<Method, T> methods = MethodIntrospector.selectMethods(userType,
 					(MethodIntrospector.MetadataLookup<T>) method -> getMappingForMethod(method, userType));
 			if (logger.isDebugEnabled()) {
 				logger.debug(methods.size() + " request handler methods found on " + userType + ": " + methods);
 			}
+			//注册方法映射
+			//这部分会根据已经筛选好的方法，来注册 HandlerMethod
+			//至此，@Controller 中的 @RequestMapping 信息已经被装载进 RequestMappingHandlerMapping
 			methods.forEach((key, mapping) -> {
 				Method invocableMethod = AopUtils.selectInvocableMethod(key, userType);
 				registerHandlerMethod(handler, invocableMethod, mapping);
@@ -458,22 +456,42 @@ public abstract class AbstractHandlerMethodMapping<T> extends AbstractHandlerMap
 			this.readWriteLock.readLock().unlock();
 		}
 
+		//外层它会保证线程安全，中间的try块会封装 Controller 和它的方法，
+		// 变成一个 HandlerMethod 对象，之后分别保存三组Map映射（源码中已标注注释），完成注册。
 		public void register(T mapping, Object handler, Method method) {
+			// 读写锁加锁
 			this.readWriteLock.writeLock().lock();
 			try {
+				// 将Controller的类型和Controller中的方法包装为一个HandlerMethod对象
 				HandlerMethod handlerMethod = createHandlerMethod(handler, method);
 				assertUniqueMethodMapping(handlerMethod, mapping);
 
 				if (logger.isInfoEnabled()) {
 					logger.info("Mapped \"" + mapping + "\" onto " + handlerMethod);
 				}
+				// 将RequestMappingInfo和Controller的目标方法存入Map中
 				this.mappingLookup.put(mapping, handlerMethod);
 
+
+				// 将注解中的映射url和RequestMappingInfo存入Map,该版本无
+//				List<String> directUrls = getDirectUrls(mapping);
+//				for (String url : directUrls) {
+//					this.urlLookup.add(url, mapping);
+//				}
+//
+//				String name = null;
+//				if (getNamingStrategy() != null) {
+//					name = getNamingStrategy().getName(handlerMethod, mapping);
+//					addMappingName(name, handlerMethod);
+//				}
+
+
+				// 将Controller目标方法和跨域配置存入Map
 				CorsConfiguration corsConfig = initCorsConfiguration(handler, method, mapping);
 				if (corsConfig != null) {
 					this.corsLookup.put(handlerMethod, corsConfig);
 				}
-
+				// uri 映射 HandlerMethod封装的MappingRegistration对象，存入Map中
 				this.registry.put(mapping, new MappingRegistration<>(mapping, handlerMethod));
 			}
 			finally {

@@ -16,26 +16,8 @@
 
 package org.springframework.web.servlet;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Properties;
-import java.util.Set;
-import javax.servlet.ServletContext;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 import org.springframework.beans.factory.BeanFactoryUtils;
 import org.springframework.beans.factory.BeanInitializationException;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
@@ -59,6 +41,13 @@ import org.springframework.web.multipart.MultipartHttpServletRequest;
 import org.springframework.web.multipart.MultipartResolver;
 import org.springframework.web.util.NestedServletException;
 import org.springframework.web.util.WebUtils;
+
+import javax.servlet.ServletContext;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.util.*;
 
 /**
  * Central dispatcher for HTTP request handlers/controllers, e.g. for web UI controllers
@@ -901,6 +890,8 @@ public class DispatcherServlet extends FrameworkServlet {
 		// Keep a snapshot of the request attributes in case of an include,
 		// to be able to restore the original attributes after the include.
 		Map<String, Object> attributesSnapshot = null;
+		//判断请求参数中是否存在javax.servlet.include.request_uri
+		//判断是否有这个属性，是为了区别页面的加载是否由include标签而来
 		if (WebUtils.isIncludeRequest(request)) {
 			attributesSnapshot = new HashMap<>();
 			Enumeration<?> attrNames = request.getAttributeNames();
@@ -912,12 +903,27 @@ public class DispatcherServlet extends FrameworkServlet {
 			}
 		}
 
-		// Make framework objects available to handlers and view objects.
+		// 将IOC容器及特定组件放入request供开发使用
 		request.setAttribute(WEB_APPLICATION_CONTEXT_ATTRIBUTE, getWebApplicationContext());
 		request.setAttribute(LOCALE_RESOLVER_ATTRIBUTE, this.localeResolver);
 		request.setAttribute(THEME_RESOLVER_ATTRIBUTE, this.themeResolver);
 		request.setAttribute(THEME_SOURCE_ATTRIBUTE, getThemeSource());
-
+		/**
+		 * 做过开发的小伙伴都知道登录操作吧，咱都知道登录是POST请求，
+		 * 最终跳转到主页必须是一个redirect的GET请求，以防止表单重复提交。
+		 * 但是这样还是会存在一个问题，如果提交表单时传入的一些数据，在重定向的GET请求还要拿到来渲染到页面上，
+		 * 这个问题就不好解决了。传统的解决方案是把要渲染的数据作为url中的参数一起组合进请求路径，但这样做url太长，
+		 * 而且内容长度也有限。
+		 *
+		 * SpringWebMvc3.1 版本以后引入了 FlashMapManager 来解决这个问题。它引入了一个 Flash Attribute 的机制，
+		 * 可以在重定向跳转时将需要渲染的数据暂时放入 session 中，这样浏览器即便刷新也不会影响数据渲染
+		 *
+		 *
+		 * SessionFlashMapManager:
+		 * 上面的背景中也描述了，默认暂时会放入 session 域来保证数据渲染，
+		 * SpringWebMvc 提供的默认实现也就是基于 session 的 FlashMapManage
+		 *
+		 */
 		if (this.flashMapManager != null) {
 			FlashMap inputFlashMap = this.flashMapManager.retrieveAndUpdate(request, response);
 			if (inputFlashMap != null) {
@@ -928,7 +934,7 @@ public class DispatcherServlet extends FrameworkServlet {
 		}
 
 		try {
-			//核心
+			//核心， doDispatch
 			doDispatch(request, response);
 		}
 		finally {
@@ -951,6 +957,13 @@ public class DispatcherServlet extends FrameworkServlet {
 	 * @param request current HTTP request
 	 * @param response current HTTP response
 	 * @throws Exception in case of any kind of processing failure
+	 *
+	 * 真正地调度处理器。
+	 *
+	 * 通过按顺序应用 Servlet 的 HandlerMappings 可以获得处理程序。
+	 * 通过查询Servlet安装的所有 HandlerAdapter 来查找支持该处理程序类的第一个 HandlerAdapter，从而获得 HandlerAdapter 。
+	 *
+	 * 所有HTTP方法都由该方法处理。由 HandlerAdapters 或处理程序本身来决定可接受的方法。
 	 */
 	protected void doDispatch(HttpServletRequest request, HttpServletResponse response) throws Exception {
 		HttpServletRequest processedRequest = request;
@@ -971,6 +984,7 @@ public class DispatcherServlet extends FrameworkServlet {
 				// Determine handler for the current request.
 				//确定当前请求的处理程序
 				//推断Controller的类型(@Controller,implements Controller)
+				//获取Handler，Handler中包含真正地处理器（Controller中的方法）和一组HandlerInterceptor拦截器
 				mappedHandler = getHandler(processedRequest);
 				if (mappedHandler == null) {
 					noHandlerFound(processedRequest, response);
@@ -980,6 +994,7 @@ public class DispatcherServlet extends FrameworkServlet {
 				// Determine handler adapter for the current request.
 				//mappedHandler.getHandler() 如果是bean返回对象,如果是方法，则返回方法
 				//适配器模式 到这里spring才知到如何反射调用
+				//获取HandlerAdapter
 				HandlerAdapter ha = getHandlerAdapter(mappedHandler.getHandler());
 
 				// Process last-modified header, if supported by the handler.
@@ -1001,6 +1016,7 @@ public class DispatcherServlet extends FrameworkServlet {
 
 				// Actually invoke the handler.
 				//反射调用方法
+				// 执行Handler，返回ModelAndView
 				mv = ha.handle(processedRequest, response, mappedHandler.getHandler());
 
 				if (asyncManager.isConcurrentHandlingStarted()) {
@@ -1008,6 +1024,7 @@ public class DispatcherServlet extends FrameworkServlet {
 				}
 
 				applyDefaultViewName(processedRequest, mv);
+				// 回调拦截器
 				mappedHandler.applyPostHandle(processedRequest, response, mv);
 			}
 			catch (Exception ex) {
@@ -1018,6 +1035,7 @@ public class DispatcherServlet extends FrameworkServlet {
 				// making them available for @ExceptionHandler methods and other scenarios.
 				dispatchException = new NestedServletException("Handler dispatch failed", err);
 			}
+			//处理视图，解析异常
 			processDispatchResult(processedRequest, response, mappedHandler, mv, dispatchException);
 		}
 		catch (Exception ex) {
@@ -1031,6 +1049,7 @@ public class DispatcherServlet extends FrameworkServlet {
 			if (asyncManager.isConcurrentHandlingStarted()) {
 				// Instead of postHandle and afterCompletion
 				if (mappedHandler != null) {
+					//回调拦截器
 					mappedHandler.applyAfterConcurrentHandlingStarted(processedRequest, response);
 				}
 			}
@@ -1125,6 +1144,9 @@ public class DispatcherServlet extends FrameworkServlet {
 	 * @param request current HTTP request
 	 * @return the processed request (multipart wrapper if necessary)
 	 * @see MultipartResolver#resolveMultipart
+	 *
+	 * 它要判断当前是否有可以处理 Multipart 类型的 Resolver，并且判断当前 request 是否为 MultipartRequest ，
+	 * 最终会执行 multipartResolver.resolveMultipart 方法
 	 */
 	protected HttpServletRequest checkMultipart(HttpServletRequest request) throws MultipartException {
 		if (this.multipartResolver != null && this.multipartResolver.isMultipart(request)) {
@@ -1138,6 +1160,7 @@ public class DispatcherServlet extends FrameworkServlet {
 			}
 			else {
 				try {
+					//实际调用org.springframework.web.multipart.support.StandardServletMultipartResolver#resolveMultipart
 					return this.multipartResolver.resolveMultipart(request);
 				}
 				catch (MultipartException ex) {

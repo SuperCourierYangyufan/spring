@@ -599,43 +599,79 @@
     * AutoConfigurationImportSelector:读取META-INF/spring.factories(spring-boot-autoconfigure)下所有的自动配置类装配到IOC容器中，之后自动配置类就会  
     通过 ImportSelector 和 @Import 的机制被创建出来，之后就生效了
 3. SPI是一种动态替换发现的机制,在META-INF/services里面声明接口的全类名,通过ServiceLoader加载出实现它的子类
-4. @WebMvcAutoConfiguration为springMvc的配置类(spring-boot-autoconfigure下META-INF/spring.factories里包含)
-    * 代码
-         ``` 
+4. MVC
+    * 自动配置类
+        - @WebMvcAutoConfiguration为springMvc的配置类(spring-boot-autoconfigure下META-INF/spring.factories里包含)
+        - 代码
+             ``` 
+                        @Configuration
+                        //当前环境必须是WebMvc（Servlet）环境
+                        @ConditionalOnWebApplication(type = Type.SERVLET)
+                        //当前运行环境的classpath中必须有Servlet类，DispatcherServlet类，WebMvcConfigurer类
+                        @ConditionalOnClass({ Servlet.class, DispatcherServlet.class, WebMvcConfigurer.class })
+                        //如果没有自定义WebMvc的配置类，则使用本自动配置
+                        @ConditionalOnMissingBean(WebMvcConfigurationSupport.class)
+                        @AutoConfigureOrder(Ordered.HIGHEST_PRECEDENCE + 10)
+             *           // @AutoConfigureAfter表示该类需要在DispatcherServletAutoConfiguration实例化后执行
+                        @AutoConfigureAfter({ DispatcherServletAutoConfiguration.class,
+                        		TaskExecutionAutoConfiguration.class, ValidationAutoConfiguration.class })
+                        public class WebMvcAutoConfiguration {
+             ```
+        - WebMvcAutoConfiguration->DispatcherServletAutoConfiguration->ServletWebServerFactoryAutoConfiguration
+            1. ServletWebServerFactoryAutoConfiguration下通过@Import导入ServletWebServerFactoryConfiguration.EmbeddedTomcat.class
+                ``` 
                     @Configuration
-                    //当前环境必须是WebMvc（Servlet）环境
-                    @ConditionalOnWebApplication(type = Type.SERVLET)
-                    //当前运行环境的classpath中必须有Servlet类，DispatcherServlet类，WebMvcConfigurer类
-                    @ConditionalOnClass({ Servlet.class, DispatcherServlet.class, WebMvcConfigurer.class })
-                    //如果没有自定义WebMvc的配置类，则使用本自动配置
-                    @ConditionalOnMissingBean(WebMvcConfigurationSupport.class)
-                    @AutoConfigureOrder(Ordered.HIGHEST_PRECEDENCE + 10)
-         *           // @AutoConfigureAfter表示该类需要在DispatcherServletAutoConfiguration实例化后执行
-                    @AutoConfigureAfter({ DispatcherServletAutoConfiguration.class,
-                    		TaskExecutionAutoConfiguration.class, ValidationAutoConfiguration.class })
-                    public class WebMvcAutoConfiguration {
-         ```
-    * WebMvcAutoConfiguration->DispatcherServletAutoConfiguration->ServletWebServerFactoryAutoConfiguration
-        1. ServletWebServerFactoryAutoConfiguration下通过@Import导入ServletWebServerFactoryConfiguration.EmbeddedTomcat.class
-            ``` 
-                @Configuration
-                //@ConditionalOnClass表示当前classPath下必须有Tomcat 这个类，该配置类才会生效
-           	*     @ConditionalOnClass({ Servlet.class, Tomcat.class, UpgradeProtocol.class })
-           	    @ConditionalOnMissingBean(value = ServletWebServerFactory.class, search = SearchStrategy.CURRENT)
-           	    public static class EmbeddedTomcat {
-            
-           	    	@Bean
-           	    	public TomcatServletWebServerFactory tomcatServletWebServerFactory() {
-           	    	//初始化Tomcat
-           	    		return new TomcatServletWebServerFactory();
-           	    	}
-            
-           	    }
-            ```
-        2. DispatcherServletAutoConfiguration分别注册 DispatcherServlet和DispatcherServletRegistrationBean
-        3. WebMvcAutoConfiguration注册了国际化组件,视图解析器,静态资源映射,主页的设置,应用图标的设置等等
-        4. WebMvcAutoConfiguration注册了国际化组件注册了SpringWebMvc 中最核心的两个组件：处理器适配器、处理器映射器。
-        5. 里面大部分使用了内部静态类，为了不向外暴露这个内部类而已；毕竟只是在外部类配置场景需要用到
+                    //@ConditionalOnClass表示当前classPath下必须有Tomcat 这个类，该配置类才会生效
+               	*     @ConditionalOnClass({ Servlet.class, Tomcat.class, UpgradeProtocol.class })
+               	    @ConditionalOnMissingBean(value = ServletWebServerFactory.class, search = SearchStrategy.CURRENT)
+               	    public static class EmbeddedTomcat {
+                
+               	    	@Bean
+               	    	public TomcatServletWebServerFactory tomcatServletWebServerFactory() {
+               	    	//初始化Tomcat
+               	    		return new TomcatServletWebServerFactory();
+               	    	}
+                
+               	    }
+                ```
+            2. DispatcherServl-etAutoConfiguration分别注册 DispatcherServlet和DispatcherServletRegistrationBean
+            3. WebMvcAutoConfiguration注册了国际化组件,视图解析器,静态资源映射,主页的设置,应用图标的设置等等
+            4. WebMvcAutoConfiguration注册了国际化组件注册了SpringWebMvc 中最核心的两个组件：处理器适配器、处理器映射器。
+            5. 里面大部分使用了内部静态类，为了不向外暴露这个内部类而已；毕竟只是在外部类配置场景需要用到
+    * 外部war启动流程
+        - 在Servlet容器（Tomcat、Jetty等）启动应用时，会扫描应用jar包中 ServletContainerInitializer 的实现类。  
+         框架必须在jar包的 META-INF/services 的文件夹中提供一个名为 javax.servlet.ServletContainerInitializer 的文件，    
+         文件内容要写明 ServletContainerInitializer 的实现类的全限定名(Servlet3.0规范中引导应用启动的说明)
+        - 基于此SpringServletContainerInitializer实现了ServletContainerInitializer
+        - 在SpringServletContainerInitializer上有注解@HandlesTypes(WebApplicationInitializer.class),该注解会将其里面  
+        WebApplicationInitializer所有普通实现类都实例化出来，之后分别调他们自己的 onStartup 方法
+        - SpringBootServletInitializer为WebApplicationInitializer得实现类,也调用其onStartup方法
+        - SpringBootServletInitializer#onStartup下核心createRootApplicationContext方法里面创建SpringApplication并且run
+    *  @Controller标注的Bean装配MVC原理
+        - WebMvcAutoConfiguration中注册了RequestMappingHandlerMapping,其中有afterPropertiesSet方法
+        - 其调用父类,判断是否含有Controller或RequestMapping,然后将@RequestMapping封装成一个RequestMappingInfo
+        - RequestMappingInfo会先解析方法级别RequestMapping,再解析类级别,加上路径前缀进行拼接
+        - 开启一个写锁保证线程安全封装 Controller 和它的方法，变成一个 HandlerMethod 对象，之后分别保存三组Map映射,完成注册。
+        - 映射分别为
+            1. RequestMappingInfo:Controller,
+            2. 注解中的映射url:和RequestMappingInfo
+            3. Controller目标方法:跨域配置
+        - 至此，@Controller 中的 @RequestMapping 信息已经被装载进 RequestMappingHandlerMapping 中
+    * DispatcherServlet的工作原理
+        * 工作流程
+            - 浏览器向服务器发起请求，由 DispatcherServlet 接收请求
+            - DispatcherServlet 委托 HandlerMapping，根据 url 来选择一个合适的 Controller 中的方法
+            - HandlerMapping 找到合适的 Controller 后，并根据已配置的拦截器，整理出一个 Handler，返回给 DispatcherServlet
+            - DispatcherServlet 收到 Handler 后委托 HandlerAdapter，将该请求代理给 HandlerMapping 选定的 Controller 中的 Handler
+            - Handler 收到请求后，实际执行 Controller 中的方法，执行完毕后会返回 ModelAndView
+            - Controller 方法执行完毕后会返回 ModelAndView
+            - HandlerAdapter 收到 Handler 返回的 ModelAndView 后返回给 DispatcherServlet
+            - DispatcherServlet 拿到 ModelAndView 后委托 ViewResolver，由 ViewResolver 负责渲染视图
+            - ViewResolver 渲染视图完成后，返回给 DispatcherServlet，由 DispatcherServlet 负责响应视图 
+        * 代码流
+            - 进入DispatcherServlet父类HttpServlet的service方法,然后根据请求类型分发到FrameworkServlet的processRequest方法上
+            -   
+         
 5. 启动流程
     1. 创建SpringApplication
         ``` 
@@ -882,13 +918,13 @@
         - ProxyTransactionManagementConfiguration注册了多个组件，用来生成事务增强器、事务切入点解析器、事务配置源、事务拦截器等组件  
         - 本质上还是经过动态代理得到JdkDynamicAopProxy,然后invoke,里面通过try{时间执行}catch{回滚}finally{清除缓存}提交
     * 事务传播行为原理，7种类型
-         - PROPAGATION_REQUIRED:【默认值：必需】当前方法必须在事务中运行，如果当前线程中没有事务，则开启一个新的事务；
-         如果当前线程中已经存在事务，则方法将会在该事务中运行。
-         - PROPAGATION_SUPPORTS:【支持】当前方法单独运行时不需要事务，但如果当前线程中存在事务时，方法会在事务中运行
-         - PROPAGATION_MANDATORY:【强制】当前方法必须在事务中运行，如果当前线程中不存在事务，则抛出异常
-         - PROPAGATION_REQUIRES_NEW:【新事务】当前方法必须在独立的事务中运行，如果当前线程中已经存在事务，则将该事务挂起，
-         重新开启一个事务，直到方法运行结束再释放之前的事务
-         - PROPAGATION_NOT_SUPPORTED:【不支持】当前方法不会在事务中运行，如果当前线程中存在事务，则将事务挂起，直到方法运行结束
-         - PROPAGATION_NEVER:【不允许】当前方法不允许在事务中运行，如果当前线程中存在事务，则抛出异常
-         - PROPAGATION_NESTED:【嵌套】当前方法必须在事务中运行，如果当前线程中存在事务，则将该事务标注保存点，形成嵌套事务。
-         嵌套事务中的子事务出现异常不会影响到父事务保存点之前的操作。
+        - PROPAGATION_REQUIRED:【默认值：必需】当前方法必须在事务中运行，如果当前线程中没有事务，则开启一个新的事务；  
+        如果当前线程中已经存在事务，则方法将会在该事务中运行。
+        - PROPAGATION_SUPPORTS:【支持】当前方法单独运行时不需要事务，但如果当前线程中存在事务时，方法会在事务中运行
+        - PROPAGATION_MANDATORY:【强制】当前方法必须在事务中运行，如果当前线程中不存在事务，则抛出异常
+        - PROPAGATION_REQUIRES_NEW:【新事务】当前方法必须在独立的事务中运行，如果当前线程中已经存在事务，则将该事务挂起，  
+        重新开启一个事务，直到方法运行结束再释放之前的事务
+        - PROPAGATION_NOT_SUPPORTED:【不支持】当前方法不会在事务中运行，如果当前线程中存在事务，则将事务挂起，直到方法运行结束
+        - PROPAGATION_NEVER:【不允许】当前方法不允许在事务中运行，如果当前线程中存在事务，则抛出异常
+        - PROPAGATION_NESTED:【嵌套】当前方法必须在事务中运行，如果当前线程中存在事务，则将该事务标注保存点，形成嵌套事务。  
+        嵌套事务中的子事务出现异常不会影响到父事务保存点之前的操作。

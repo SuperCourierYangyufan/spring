@@ -16,9 +16,6 @@
 
 package org.springframework.web.reactive.result.method.annotation;
 
-import java.lang.reflect.AnnotatedElement;
-import java.lang.reflect.Method;
-
 import org.springframework.context.EmbeddedValueResolverAware;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.lang.Nullable;
@@ -36,6 +33,9 @@ import org.springframework.web.reactive.accept.RequestedContentTypeResolverBuild
 import org.springframework.web.reactive.result.condition.RequestCondition;
 import org.springframework.web.reactive.result.method.RequestMappingInfo;
 import org.springframework.web.reactive.result.method.RequestMappingInfoHandlerMapping;
+
+import java.lang.reflect.AnnotatedElement;
+import java.lang.reflect.Method;
 
 /**
  * An extension of {@link RequestMappingInfoHandlerMapping} that creates
@@ -82,7 +82,7 @@ public class RequestMappingHandlerMapping extends RequestMappingInfoHandlerMappi
 		this.config = new RequestMappingInfo.BuilderConfiguration();
 		this.config.setPatternParser(getPathPatternParser());
 		this.config.setContentTypeResolver(getContentTypeResolver());
-
+		//调用父类
 		super.afterPropertiesSet();
 	}
 
@@ -107,15 +107,39 @@ public class RequestMappingHandlerMapping extends RequestMappingInfoHandlerMappi
 	 */
 	@Override
 	protected RequestMappingInfo getMappingForMethod(Method method, Class<?> handlerType) {
+		// 创建方法级别的RequestMappingInfo,在解析 @RequestMapping，
+		// 最终会把 @RequestMapping 及相关的属性封装到一个 RequestMappingInfo
 		RequestMappingInfo info = createRequestMappingInfo(method);
 		if (info != null) {
+			// 创建类级别的RequestMappingInfo
+			//这部分也是一样的道理，不过这里面有个关键的部分：
+			// 如果类上声明了 @RequestMapping 注解，会把这段注解跟方法上的 @RequestMapping 做一个拼接
 			RequestMappingInfo typeInfo = createRequestMappingInfo(handlerType);
 			if (typeInfo != null) {
 				info = typeInfo.combine(info);
 			}
+			// 拼接路径前缀,该版本没有
+//			String prefix = getPathPrefix(handlerType);
+//			if (prefix != null) {
+//				info = RequestMappingInfo.paths(prefix).build().combine(info);
+//			}
 		}
 		return info;
 	}
+
+//	@Nullable
+//	String getPathPrefix(Class<?> handlerType) {
+//		for (Map.Entry<String, Predicate<Class<?>>> entry : this.pathPrefixes.entrySet()) {
+//			if (entry.getValue().test(handlerType)) {
+//				String prefix = entry.getKey();
+//				if (this.embeddedValueResolver != null) {
+//					prefix = this.embeddedValueResolver.resolveStringValue(prefix);
+//				}
+//				return prefix;
+//			}
+//		}
+//		return null;
+//	}
 
 	/**
 	 * Delegates to {@link #createRequestMappingInfo(RequestMapping, RequestCondition)},
