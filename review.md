@@ -928,3 +928,12 @@
         - PROPAGATION_NEVER:【不允许】当前方法不允许在事务中运行，如果当前线程中存在事务，则抛出异常
         - PROPAGATION_NESTED:【嵌套】当前方法必须在事务中运行，如果当前线程中存在事务，则将该事务标注保存点，形成嵌套事务。  
         嵌套事务中的子事务出现异常不会影响到父事务保存点之前的操作。
+11. 嵌入式容器Tomcat
+    * Tomcat核心容器
+        - Service：一个 Tomcat-Server 可以有多个 Service ， Service 中包含下面的所有组件
+        - Connector：用于与客户端交互，接收客户端的请求，并将结果响应给客户端
+        - Engine：负责处理来自 Service 中的 Connector 的所有请求
+        - Host：可理解为主机，一个主机绑定一个端口号
+        - Context：可理解为应用，一个主机下有多个应用，一个应用中有多个 Servlet （可以简单理解为 webapps 中一个文件夹代表一个 Context ）
+    * onRefresh()中初始化了tomcat,但是因为删除了ServiceConnectors，所以启动时只将所有组件给初始化,并未正在的启动
+    * finishRefresh()中归还了Connector,并正在的启动
