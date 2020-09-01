@@ -64,6 +64,10 @@
         1. 只允许一条记录key=null,允许多条value=null
         2. 扩容=2,负载=0.75
         3. 7->8 从链表长度8个以后为红黑树 时间复杂度从O(n)->O(logN)
+        4. HashMap为何线程不安全
+            - put时key相同导致其中⼀个线程的value被覆盖
+            - 多个线程同时扩容，造成数据丢失
+            - 多线程扩容时导致Node链表形成环形结构造成.next()死循环，导致CPU利⽤率接近100%
     2. ConcurrentHashMap 分段锁,默认分段数为16,JDK8同样引入红黑树
     3. HashTable 
     4. TreeMap 实现SortedMap接口，能够把它保存的记录根据键排序，默认是按键值的升序排序。key必须实现Comparable接口或者在  
@@ -86,7 +90,7 @@
     2. 线程等待队列
         1. 阻塞队列
             1. LinkedBlockingQueue<Runnable>() 可用于Web服务瞬时削峰，但需注意长时间持续高峰情况造成的队列阻塞，由链表结构  
-            组成的有界阻塞队列,先进先出排序,特定是对消费端和生成端分别采用独立锁,锁细分
+            组成的无界阻塞队列,先进先出排序,特定是对消费端和生成端分别采用独立锁,锁细分
             2. SynchronousQueue<Runnable>() 快速处理大量耗时较短的任务，如Netty的NIO接受请求时 并发同步阻塞不存储元素队列,
             每一个put操作必须等待一个take操作，否则不能继续添加元素
             3. ArrayBlockingQueue 由数组结构组成的有界阻塞队列,先进先出排序,默认情况不保证访问者的公平性
@@ -104,6 +108,11 @@
             3. 有界队列一个有界的队列和有限的maximumPoolSizes配置有助于防止资源耗尽，但是难以控制。队列大小和maximumPoolSizes  
             需要 相互权衡
             4. 有界和无界最大区别就是队列数量有无界限
+        4.  如果你提交任务时，线程池队列已满，这时会发⽣什么
+            - 如果你使⽤的LinkedBlockingQueue，也就是⽆界队列的话，没关系，继续添加任务到阻塞队列中等待执⾏，因为LinkedBlockingQueue  
+            可以近乎认为是⼀个⽆穷⼤的队列，可以⽆限存放任务
+            - 如果你使⽤的是有界队列⽐⽅说ArrayBlockingQueue的话，任务⾸先会被添加到ArrayBlockingQueue中,ArrayBlockingQueue满了，  
+            则会使⽤拒绝策略RejectedExecutionHandler处理满了的任务，默认是AbortPolicy。
     3. 拒绝任务,拒绝任务有两种情况：1. 线程池已经被关闭；2. 任务队列已满且maximumPoolSizes已满  
         1. AbortPolicy：默认测策略，抛出RejectedExecutionException运行时异常
         2. CallerRunsPolicy：这提供了一个简单的反馈控制机制，可以减慢提交新任务的速度
@@ -117,6 +126,25 @@
         2. 线程未处于阻塞状态：使用isInterrupted()判断线程的中断标志来退出循环。当使用interrupt()方法时，中断标志就会  
         置true，和使用自定义的标志来控制循环是一样的道理
     4. thread.stop()来强行终止线程,线程不安全
+4. 常见问题
+    1. 如何在两个线程之间共享数据?通过在线程之间共享对象就可以了，然后通过wait/notify/notifyAll、await/signal/signalAll进⾏唤起和等待
+    2. 单例模式的线程安全性?饿汉式(对象初始化时初始化),双检锁单例模式线程安全,懒汉式(调用时初始化)不安全
+    3. spring默认时饿汉式,@lazy则是懒汉模式
+    4. spring单例为什么没有安全问题?
+        - spring使⽤ThreadLocal解决线程安全问题,ThreadLocal提供了线程安全的共享对象，在编写多线程代码时，  
+        !(可以把不安全的变量封装进ThreadLocal)。概括起来说，对于多线程资源共享的问题，同步机制采⽤了“以时间换空间”的⽅式，⽽ThreadLocal采⽤了  
+        “以空间换时间”的⽅式。前者仅提供⼀份变量，让不同的线程排队访问，⽽后者为每⼀个线程都提供了⼀份变量，因此可以同时访问⽽互不影响
+        - ⽆状态的Bean(⽆状态就是⼀次操作，不能保存数据。⽆状态对象(Stateless Bean)，就是没有实例变量的对象，不能保存数据，是不变类，  
+        是线程安全的。)适合⽤不变模式，技术就是单例模式，这样可以共享实例，提⾼性能。
+    5. ThreadLocal为什么会发⽣内存泄漏?
+        - ThreadLocal维护一个Map<ThreadLocal实例本身,value 是真正需要存储的 Object>
+        - 也就是说ThreadLocal本身并不存储值，它只是作为⼀个key来让线程从ThreadLocalMap获取value,
+        - ThreadLocalMap 是使⽤ ThreadLocal 的弱引⽤作为 Key 的，弱引⽤的对象在 GC 时会被回收
+        - 如果⼀个ThreadLocal没有外部强引⽤来引⽤它，那么系统 GC的时候，这个ThreadLocal势必会被回收，  
+        这样⼀来，ThreadLocalMap中就会出现key为null的Entry，就没有办法访问这些key为null的Entry的value
+        - 如果当前线程再迟迟不结束的话，这些key为null的Entry的value就会⼀直存在⼀条强引⽤链：  
+        Thread Ref -> Thread -> ThreaLocalMap -> Entry -> value永远⽆法回收，造成内存泄漏
+    
     
 # 锁
 1. 锁类型
@@ -235,6 +263,18 @@
         * 在CountDownLatch中，表示计数还剩的次数，当到达0时，唤醒等待线程。
         * 在Semaphore中，表示AQS还可以被获取锁的次数，获取一次就减1，当到达0时，尝试获取的线程将会阻塞
     9. AbstractQueuedSynchronizer简称AQS，是⼀一个⽤用于构建锁和同步容器器的框架
+10. 分布式锁
+    1. Zookeeper：基于zookeeper瞬时有序节点实现的分布式锁
+        - 每个客户端对某个功能加锁时，在zookeeper上的与该功能对应的指定节点的⽬录下，⽣成⼀个唯⼀的瞬时有序节点。判断是否获取锁的⽅式很简  
+          单，只需要判断有序节点中序号最⼩的⼀个。当释放锁的时候，只需将这个瞬时节点删除即可。同时，其可以避免服务宕机导致的锁  
+          ⽆法释放，⽽产⽣的死锁问题
+        - 锁安全性⾼，zk可持久化，且能实时监听获取锁的客户端状态。⼀旦客户端宕机，则瞬时节点随之消失，zk因⽽能第⼀时间释放锁。  
+        这也省去了⽤分布式缓存实现锁的过程中需要加⼊超时时间判断的这⼀逻辑
+        - 性能开销⽐较⾼。因为其需要动态产⽣、销毁瞬时节点来实现锁功能。所以不太适合直接提供给⾼并发的场景使⽤,对可靠性要求⾮常⾼，  
+        且并发程度不⾼的场景下使⽤。如核⼼数据的定时全量/增量同步等
+    2. redis
+        - redis分布式锁即可以结合zk分布式锁锁⾼度安全和memcached并发场景下效率很好的优点，其实现⽅式和memcached类似，  
+        采⽤setnx即可实现。需要注意的是，这⾥的redis也需要设置超时时间，以避免死锁。可以利⽤jedis客户端实现。 
 
 # 基础
 1. 反射
