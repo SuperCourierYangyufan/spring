@@ -935,6 +935,9 @@
         - InitDestroyAnnotationBeanPostProcessor：触发执行Bean中标注 @PostConstruct 、@PreDestroy 注解的方法
         - ConfigurationClassPostProcessor：解析加了 @Configuration 的配置类，解析 @ComponentScan 注解扫描的包，以及解析 @Import 、@ImportResource 等注解
         - AutowiredAnnotationBeanPostProcessor：负责处理 @Autowired 、@Value 等注解
+    * Dubbo 会在 Spring 实例例化完 bean 之后，在刷新容器器最后⼀一步发布 ContextRefreshEvent 事件的时候，通知实现了了  
+    ApplicationListener 的 ServiceBean 类进⾏行行回调 onApplicationEvent 事件⽅方法，Dubbo 会在这个⽅方法中调⽤用 ServiceBean   
+    ⽗父类ServiceConfig 的 export ⽅方法，⽽而该⽅方法真正实现了了服务的（异步或者⾮非异步）发布    
 7. 循环依赖
     * 重要集合
         - singletonObjects：一级缓存，存放完全初始化好的Bean的集合，从这个集合中取出来的Bean可以立马返回
