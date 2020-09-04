@@ -56,7 +56,10 @@
 
 # 集合
 1.  List
-    1. ArrayList,Vector(安全的ArrayList),LinkList
+    1. ArrayList
+        - 构造一个默认的容量为10的空的集合
+        - 扩容背数:(旧大小*3/2)+1
+        - 
 2. Set
     1. HashSet,TreeSet(自己定义的类必须实现Comparable接口，并且覆写相应的compareTo()函数),LinkHashSet(基于LinkHashMap)
 3. Map
@@ -144,7 +147,6 @@
         这样⼀来，ThreadLocalMap中就会出现key为null的Entry，就没有办法访问这些key为null的Entry的value
         - 如果当前线程再迟迟不结束的话，这些key为null的Entry的value就会⼀直存在⼀条强引⽤链：  
         Thread Ref -> Thread -> ThreaLocalMap -> Entry -> value永远⽆法回收，造成内存泄漏
-    
     
 # 锁
 1. 锁类型
@@ -354,7 +356,6 @@
     2. partition物理上由多个segment文件组成,每个segment相等,顺序读写
     3. kafka为每个segment中的数据文件建立了索引,采用稀疏存储，每隔一定字节建立索引
     
-    
 # RocketMq
 1. rocketMq分为pull模式和Push模式,push通过长轮询得pull实现
 2. RocketMq定义了一个ProcessQueue,来解决监控和控制,比如:如何得知当前消息堆积的数量,如何重复处理某些消息,如何延迟处理某些消息
@@ -409,7 +410,6 @@
         - 检测延时情况，跳过非重要消息
     * Consumer负载均衡默认五种,也可自己实现
     
-       
 # 数据库
 1. 存储引擎包含InnoDB,MyIsam,memory,Archive,Federated等等
 2. InnoDB(B+树)
