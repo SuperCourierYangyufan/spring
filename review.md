@@ -28,9 +28,9 @@
     3. 弱 只要垃圾回收机制一运行，不管JVM的内存空间是否足够，总会回收该对象占用的内存
     4. 虚 虚引用的主要作用是跟踪对象被垃圾回收的状态
 9. 垃圾收集器
-    1. Serial             新/老  单线程  复制算法/标记整理
+    1. Serial(C rv o)             新/老  单线程  复制算法/标记整理
     2. ParNew             新     多线程  复制算法
-    3. Parallel Scavenge  新/老  多线程  复制算法/标记整理 它重点关注的是程序达到一个可控制的吞吐量，自适应调节策略也是  
+    3. Parallel Scavenge(par en 冷 斯嘎润几)  新/老  多线程  复制算法/标记整理 它重点关注的是程序达到一个可控制的吞吐量，自适应调节策略也是  
     ParallelScavenge收集器与ParNew收集器的一个重要区别
     4. CMS                老     多线程  标记整理          主要目标是获取最短垃圾回收停顿时间,流程如下
         1. 标记GC Roots能直接关联的对象,仍然需要暂停所有的工作线程
@@ -109,7 +109,12 @@
             - 从任意节点到其子树中每个叶子结点的路径都包含相同数量的黑色节点
             - 所有的叶子节点都是黑色的
             - 新加入到红黑树的节点为红色节点
-            
+        7. 新元素插入数组节点下列表时,7前采用头插法,8后采用尾插法
+            - 当采用头插法时,同时两个线程A,B进来,链表为(头)A->B(尾),然后扩容,先插入A,找到下一个节点B插入,新的链表为B->A,  
+            但是之前链表为A->B,一直找下一个会照成死循环,8采用红黑树,尾插法就没有这个问题
+        8. 为什么默认初始值为16?为什么初始化需要为2的幂
+            - 这样是为了位运算的方便，位与运算比算数计算的效率高了很多，之所以选择16,因为是计算hash值为(hashCode & (16-1))  
+            而16-1=15,15二进制就是1111,这样hashcode进行比较时,只需要看后几位。这样就将位运算代替了取模。
     2. ConcurrentHashMap 分段锁,默认分段数为16,JDK8同样引入红黑树
     3. HashTable 
     4. TreeMap 实现SortedMap接口，能够把它保存的记录根据键排序，默认是按键值的升序排序。key必须实现Comparable接口或者在  
@@ -121,7 +126,7 @@
     1. 继承Thread类,重写run()方法,类.start()启动线程,start()为native方法
     2. 实现Runnable接口，实现run()方法,new Thread(实现类).start()
     3. 实现Callable接口.可以得到有结果返回的Future对象
-2. 线程池 Executor
+2. 线程池 Executor(一栽Q特)
     1. public ThreadPoolExecutor(int corePoolSize, // 核心线程池大小  
                                  int maximumPoolSize,  // 最大线程池大小  
                                  long keepAliveTime,  // 线程最大空闲时间  
@@ -163,12 +168,23 @@
 3. 线程结束的方式
     1. 正常运行结束
     2. 外部设置标志内部判断跳出
-    3. Interrupt方法结束线程  
+    3. Interrupt(in ner rui pu te)方法结束线程  
         1. 如使用了sleep,同步锁的wait,socket中的receiver,accept等方法时，会使线程处于阻塞状态。当调用线程的interrupt() 方法时会抛出InterruptException异常,通过代码捕获该异常，然后break跳出循环状态
         2. 线程未处于阻塞状态：使用isInterrupted()判断线程的中断标志来退出循环。当使用interrupt()方法时，中断标志就会  
         置true，和使用自定义的标志来控制循环是一样的道理
     4. thread.stop()来强行终止线程,线程不安全
-4. 常见问题
+4. ThreadLocal
+    * ThreadLocal为什么会发⽣内存泄漏?
+        - ThreadLocal维护一个Map<ThreadLocal实例本身,value 是真正需要存储的 Object>
+        - 也就是说ThreadLocal本身并不存储值，它只是作为⼀个key来让线程从ThreadLocalMap获取value,
+        - ThreadLocalMap 是使⽤ ThreadLocal 的弱引⽤作为 Key 的，弱引⽤的对象在 GC 时会被回收
+        - 如果⼀个ThreadLocal没有外部强引⽤来引⽤它，那么系统 GC的时候，这个ThreadLocal势必会被回收，  
+        这样⼀来，ThreadLocalMap中就会出现key为null的Entry，就没有办法访问这些key为null的Entry的value
+        - 如果当前线程再迟迟不结束的话，这些key为null的Entry的value就会⼀直存在⼀条强引⽤链：  
+        Thread Ref -> Thread -> ThreaLocalMap -> Entry -> value永远⽆法回收，造成内存泄漏
+    * 底层为数组,key+value组成一个entity对象,根据该对象计算hash值,找到对应的位置,若key相同覆盖,若不相同往后一位查询是否有空位
+    * 使用InheritableThreadLocal(in hai rui bo)创建实例,存入对象,子线程可以得到值
+5. 常见问题
     1. 如何在两个线程之间共享数据?通过在线程之间共享对象就可以了，然后通过wait/notify/notifyAll、await/signal/signalAll进⾏唤起和等待
     2. 单例模式的线程安全性?饿汉式(对象初始化时初始化),双检锁单例模式线程安全,懒汉式(调用时初始化)不安全
     3. spring默认时饿汉式,@lazy则是懒汉模式
@@ -178,14 +194,6 @@
         “以空间换时间”的⽅式。前者仅提供⼀份变量，让不同的线程排队访问，⽽后者为每⼀个线程都提供了⼀份变量，因此可以同时访问⽽互不影响
         - ⽆状态的Bean(⽆状态就是⼀次操作，不能保存数据。⽆状态对象(Stateless Bean)，就是没有实例变量的对象，不能保存数据，是不变类，  
         是线程安全的。)适合⽤不变模式，技术就是单例模式，这样可以共享实例，提⾼性能。
-    5. ThreadLocal为什么会发⽣内存泄漏?
-        - ThreadLocal维护一个Map<ThreadLocal实例本身,value 是真正需要存储的 Object>
-        - 也就是说ThreadLocal本身并不存储值，它只是作为⼀个key来让线程从ThreadLocalMap获取value,
-        - ThreadLocalMap 是使⽤ ThreadLocal 的弱引⽤作为 Key 的，弱引⽤的对象在 GC 时会被回收
-        - 如果⼀个ThreadLocal没有外部强引⽤来引⽤它，那么系统 GC的时候，这个ThreadLocal势必会被回收，  
-        这样⼀来，ThreadLocalMap中就会出现key为null的Entry，就没有办法访问这些key为null的Entry的value
-        - 如果当前线程再迟迟不结束的话，这些key为null的Entry的value就会⼀直存在⼀条强引⽤链：  
-        Thread Ref -> Thread -> ThreaLocalMap -> Entry -> value永远⽆法回收，造成内存泄漏
     
 # 锁
 1. 锁类型
@@ -209,12 +217,12 @@
         2. 当作用于静态方法时，锁住的是Class实例
         3. 作用于一个对象实例时，锁住的是所有以该对象为锁的代码块
     2. 核心组件
-        1. Wait Set:调用Wait方法,线程阻塞的对象放置于此
-        2. Contention List:所有请求该锁的请求首先放置于该队列中
-        3. Entry List: Contention中有资格成为候选者放入该队列
-        4. OnDeck:任意时刻,只有一个线程正在竞争锁,该线程就是OnDeck
+        1. Contention List:所有请求该锁的请求首先放置于该队列中
+        2. Entry List: Contention中有资格成为候选者放入该队列
+        3. OnDeck:任意时刻,只有一个线程正在竞争锁,该线程就是OnDeck
+        4. Wait Set:调用Wait方法,线程阻塞的对象放置于此
         5. Owner:获得锁权限的线程
-        5. !Owner:当前释放锁的线程
+        6. !Owner:当前释放锁的线程
     3. 实现
         1. 一个线程线先会尝试自旋获取锁,如果获取不到会进入Contention,这能体现出synchronized是非公平的
         2. 因为并发情况下Contention会进行大量CAS访问,为了降低对尾部元素竞争,jvm会将一部分Contention放入Entry
@@ -224,7 +232,7 @@
         5. OnDeck线程获取到锁资源后会变为Owner,而没有得到锁资源的仍然停留在 EntryList中。
         6. 如果 Owner 线程被 wait 方法阻塞，则转移到 WaitSet 队列中直到某个时刻通过 notify或者 notifyAll 唤醒，会重新进去 EntryList 中
     4. 注意
-        1. 每个对象都有个monitor(班长)对象加锁就是在竞争monitor对象，代码块加锁是在前后分别加,上monito和 monitorexit 指令来实现的，  
+        1. 每个对象都有个monitor(mou le te)(班长)对象加锁就是在竞争monitor对象，代码块加锁是在前后分别加,上monito和 monitorexit 指令来实现的，  
         方法加锁是通过一个标记位来判断的
         2. synchronized 是一个重量级操作，需要调用操作系统相关接口，性能是低效的，有可能给线程加锁消耗的时间比有用操作消耗的时间更多。
         3. JDK6引入适应自旋、锁消除、锁粗化、轻量级锁及偏向锁等，效率有了本质上的提高
@@ -235,7 +243,7 @@
         2. synchronized是同步阻塞,悲观。lock是同步非阻塞,乐观
         3. lock会自动释放锁,而Lock需要手动
         4. Lock可以实现读写锁
-3. ReentrantLock继承Lock并实现接口中定义的方法,是一种可重入锁,除了可完成synchronized的工作外,还可相应中断锁,轮询锁请求,定时锁
+3. ReentrantLock(re an quan lock)继承Lock并实现接口中定义的方法,是一种可重入锁,除了可完成synchronized的工作外,还可相应中断锁,轮询锁请求,定时锁
     1. ReentrantLock 通过方法 lock()与 unlock()来进行加锁与解锁操作，与 synchronized 会被 JVM 自动解锁机制不同，ReentrantLock 加锁后需要手动进行解锁
     2. ReentrantLock 相比 synchronized 的优势是可中断、公平锁、多个锁。这种情况下需要使用 ReentrantLock
     3. 需要再finally中进行解锁操作
@@ -261,7 +269,7 @@
 4. 线程方法
     1. 线程等待（wait）
     2. 线程睡眠（sleep）
-    3. 线程让步（yield）
+    3. 线程让步（yield)(一流的)
     4. 线程中断（interrupt）
     5. 等待其他线程终止(Join)在当前线程中调用一个线程的 join() 方法，则当前线程转为阻塞状态，回到另主线程结束，当前线程  
     再由阻塞状态变为就绪状态，等待 cpu 的宠幸
@@ -271,7 +279,7 @@
     2. 上下文是指某一时间点CPU 寄存器和程序计数器的内容
     3. 寄存器 是CPU 内部的数量较少但是速度很快的内存（与之对应的是CPU 外部相对较慢的RAM 主内存）
     4. 程序计数器 是一个专用的寄存器，用于表明指令序列中CPU 正在执行的位置，存的值为正在执行的指令的位置或者下一个将要被执行的指令的位置
-6. volatile提供了一种稍弱的同步机制(不加锁),用来确保将变量的更新操作通知到其他线程
+6. volatile(wo了头)提供了一种稍弱的同步机制(不加锁),用来确保将变量的更新操作通知到其他线程
     1. 变量可见:保证所有线程可见,值一个线程修改了值,那么新的值对于其他线程是可见的,且每次读取必须刷新内存种最新值
     2. 禁止重排序:禁止了JVM的指令重排序
     3. 对于非volatile的变量读写,每个线程会先拷贝到当前CPU缓存,多个CPU拷贝的值可能会不一样
@@ -284,7 +292,7 @@
     2. 若不相等,说明其他线程已经更新,就会返回V,也就是真实值
     3. 运许失败后重试,知道成功,比如使用version字段,是乐观锁
     4. ABA问题,某个线程将值从1变为0,然后再次为1.对于其他线程有可能发生在一次操作中，为感知到已变化过,version无此问题
-9. AQS 抽象的队列同步器,AQS定义了一套多线程访问共享资源的同步框架,如ReentrantLock,Semaphore,CountDownLatch
+9. AQS 抽象的队列同步器,AQS定义了一套多线程访问共享资源的同步框架,如ReentrantLock(rv 安全 lock),Semaphore(3 mo fou),CountDownLatch
     1. 由一个先进先出线程队列(多线程阻塞竞争阻塞时放入此队列)和一个state(资源)构成
     2. 如果被请求的共享资源空闲，则将当前请求资源的线程设置为有效的工作线程，并将共享资源设置为锁定状态，如果被请求的共享资源被占用，  
     那么就需要一套线程阻塞等待以及被唤醒时锁分配的机制，这个机制AQS是用CLH队列锁实现的，即将暂时获取不到锁的线程加入到队列中
@@ -327,6 +335,13 @@
     1. 前序 根->左->右
     2. 中序 左->根->右
     3. 后序 左->右->根
+4. GET and POST区别
+    - 根据HTTP规范，GET用于信息获取，而且应该是安全的和幂等的
+    - GET方式提交的数据最多只能是1024字节，理论上POST没有限制，可传较大量的数据
+    - POST相对安全不能做缓存
+    - GET在浏览器回退时是无害的，而POST会再次提交请求
+    - 对于GET方式的请求，浏览器会把http header和data一并发送出去，服务器响应200,而对于POST，浏览器先发送header，服务器响  
+    应100 continue，浏览器再发送data，服务器响应200 ok
 
 #Mybatis
 1. 一级缓存
@@ -401,7 +416,10 @@
     * dubbo 通信协议 dubbo 协议为什么采用异步单一长连接?因为服务的现状大都是服务提供者少，通常只有几台机器,而服务的消费者多，可能整个网站都在访问该服务  
     比如 customer-api 的提供者只有 6 台提供者，却有上百台消费者，每天有 1.5 亿次调用，如果采用常规的 hessian 服务，服务提供者很容易就被压跨  
     通过单一连接，保证单一消费者不会压死提供者,长连接，减少连接握手验证等，并使用异步 IO，复用线程池，防止 C10K 问题
-        
+    * 服务引入的三种方式
+        - 本地引入,生产者自己掉自己的服务,不需要网络开销
+        - 直连远程引入服务
+        - 注册中心引入远程服务     
     
         
  # kafka
@@ -421,7 +439,7 @@
     
 # RocketMq
 1. rocketMq分为pull模式和Push模式,push通过长轮询得pull实现
-2. RocketMq定义了一个ProcessQueue,来解决监控和控制,比如:如何得知当前消息堆积的数量,如何重复处理某些消息,如何延迟处理某些消息
+2. RocketMq定义了一个ProcessQueue；,来解决监控和控制,比如:如何得知当前消息堆积的数量,如何重复处理某些消息,如何延迟处理某些消息
     * ProcessQueue对象里主要的内容是一个TreeMap和一个读写锁
         - TreeMap里以MessageQueue的Offset作为Key，以消息内容的引用为Value，保存了所有从MessageQueue获取到，但是还未被处理的消息
         - 读写锁控制着多个线程对TreeMap对象的并发访问
@@ -450,7 +468,8 @@
     * NameServer的功能虽然非常重要，但是被设计得很轻量级，代码量少并且几乎无磁盘存储，所有的功能都通过内存高效完成
     * RocketMQ基于Netty对底层通信做了很好的抽象，使得通信功能逻辑清晰
 5. Broker是RocketMQ的核心,包括接受生产者消息,处理消费者请求、消息的持久化存储、消息的HA机制以及服务端过滤功能等
-    * 磁盘读写,顺序写速度可以达到600MB/s,而磁盘随机写的速度只有大概lOOKB/s
+    * 磁盘读写,顺序写速度可以达到600MB/s,而磁盘随机写的速度只有
+    大概lOOKB/s
     * RocketMQ消息的存储是由ConsumeQueue和CommitLog配合完成的
         - ConsumeQueue本质队列里面放的不是数据,而是个指针,指向的是物理存储地址，也就是CommitLog里面对应的数据
         - 在CommitLog中，一个消息的存储长度是不固定的，RocketMQ采取一些机制，尽量向CommitLog中顺序写，但是随机读
@@ -516,7 +535,7 @@
         * 为了防止不同物理空间上存放太远的页进行随机I/O过于慢,所以引出区
         * 碎片区:在一个碎片区中，并不是所有的页都是为了存储同一个段的数据而存在的，可以是叶子节点的页+非叶子节点的页,当某个  
         段占用了32个碎片区页面之后，就会以完整的区为单位来分配存储空间
-    4. 页是MySQL中磁盘和内存交互的基本单位，也是MySQL是管理存储空间的基本单位，默认大小为16KB。一次读写最小也是16kb
+    4. 页是MySQL中 磁盘和内存交互的基本单位，也是MySQL是管理存储空间的基本单位，默认大小为16KB。一次读写最小也是16kb
         * Mysql规定一个页中至少存放两行记录,如果我们一条记录的某个列中存储的数据占用的字节数非常多时，该列就可能成为溢出列
         * 页结构
             1. FileHeader,文件头部,页的一些通用信息,比方说这个页的编号是多少，它的上一个页、下一个页是谁,页的类型,比如索引页，也就是我们  
@@ -711,8 +730,9 @@
 
 # Spring源码部分       
 1. @Import 可以传入四种类型：普通类、配置类、ImportSelector 的实现类,ImportBeanDefinitionRegistrar的实现类
-2. @EnableAutoConfiguration(@AutoConfigurationPackage,@Import(AutoConfigurationImportSelector.class))
-    * @AutoConfigurationPackage,表示包含该注解的类所在的包应该在 AutoConfigurationPackages 中注册
+2. 自动装配
+    * @SpringBootApplication->@EnableAutoConfiguration->@@AutoConfigurationPackage->@Import(AutoConfigurationPackages.Registrar.class)
+    * AutoConfigurationPackages.Registrar中取主启动类所在包及子包下的组件设置为basePackage.
     * AutoConfigurationImportSelector:读取META-INF/spring.factories(spring-boot-autoconfigure)下所有的自动配置类装配到IOC容器中，之后自动配置类就会  
     通过 ImportSelector 和 @Import 的机制被创建出来，之后就生效了
 3. SPI是一种动态替换发现的机制,在META-INF/services里面声明接口的全类名,通过ServiceLoader加载出实现它的子类
@@ -751,7 +771,7 @@
                 
                	    }
                 ```
-            2. DispatcherServl-etAutoConfiguration分别注册 DispatcherServlet和DispatcherServletRegistrationBean
+            2. DispatcherServletAutoConfiguration分别注册 DispatcherServlet和DispatcherServletRegistrationBean
             3. WebMvcAutoConfiguration注册了国际化组件,视图解析器,静态资源映射,主页的设置,应用图标的设置等等
             4. WebMvcAutoConfiguration注册了国际化组件注册了SpringWebMvc 中最核心的两个组件：处理器适配器、处理器映射器。
             5. 里面大部分使用了内部静态类，为了不向外暴露这个内部类而已；毕竟只是在外部类配置场景需要用到
@@ -808,6 +828,19 @@
             - 然后根据ModelAndView判断是否有异常,如果有异常寻找合适的异常处理器返回,若没有则渲染视图
             - 最后回调拦截器(HandlerIntercepto)的afterConcurrentHandlingStarted方法
         * @ResponseBody响应json数据的原理:在对Controller结果进行处理时,不采用ViewNameMethodReturnValueHandler，而是使用 RequestResponseBodyMethodProcessor
+    * 9大组件
+        - 通过onRefresh方法初始化,初始了9个组件
+        - HandlerMapping:根据request找到相应的处理器Handler和Intecepter拦截器
+        - HandlerAdapter:handle方法就是使用handler来处理逻辑的。处理之后返回一个ModelAndView
+        - HandlerExceptionResolver:这个组件的作用就是根据异常设置ModelAndView，然后再将处理结果交给render方法进行渲染。
+        - ViewResolver:ViewResolver的作用是将String类型的逻辑视图根据local解析为View视图
+        - LocalResolver:解析视图需要两个参数，一个是String类型的逻辑视图名，另外一个是local。LocalResolver的作用就是从  
+        request中解析出local的(viewName String类型的视图名,local 区域，可以用来做国际化)
+        - ThemeResolver:对于我们常见的网页界面活着手机界面来说，一套主题无非就是换一套图片，活着css样式文件等等。  
+        我们通过ThemeResolver这个就可以实现这样的功能
+        - RequestToViewNameTranslator:将request请求转换为视图名称
+        - MultipartResolver:MultipartResolver就是用来处理上传请求的。其处理方式就是将request包装成MultipartHttpServletRequest
+        - FlashMapManager:这个在redirect是进行参数传递需要用到
 5. 启动流程
     1. 创建SpringApplication
         ``` 
@@ -1004,13 +1037,13 @@
     * Spring应用的IOC容器需要依赖 Environment - 运行环境，它用来表示整个Spring应用运行时的环境，它分为 profiles 和 properties 两个部分。  
     通过配置不同的 profile ，可以支持配置的灵活切换，并且可以同时配置一到多个 profile 来共同配置 Environment
     * 后置处理器
-        - BeanPostProcessor：Bean实例化后，初始化的前后触发
-        - BeanDefinitionRegistryPostProcessor：所有Bean的定义信息即将被加载但未实例化时触发
-        - BeanFactoryPostProcessor：所有的 BeanDefinition 已经被加载，但没有Bean被实例化时触发
-        - InstantiationAwareBeanPostProcessor：Bean的实例化对象的前后过程、以及实例的属性设置（AOP）
-        - InitDestroyAnnotationBeanPostProcessor：触发执行Bean中标注 @PostConstruct 、@PreDestroy 注解的方法
-        - ConfigurationClassPostProcessor：解析加了 @Configuration 的配置类，解析 @ComponentScan 注解扫描的包，以及解析 @Import 、@ImportResource 等注解
-        - AutowiredAnnotationBeanPostProcessor：负责处理 @Autowired 、@Value 等注解
+            * BeanPostProcessor(接口)：Bean实例化后，初始化的前后触发
+                1. AutowiredAnnotationBeanPostProcessor：负责处理 @Autowired 、@Value 等注解
+                2. InstantiationAwareBeanPostProcessor：Bean的实例化对象的前后过程、以及实例的属性设置（AOP）
+                3. InitDestroyAnnotationBeanPostProcessor：触发执行Bean中标注 @PostConstruct 、@PreDestroy 注解的方法
+            * BeanFactoryPostProcessor(接口)：所有的 BeanDefinition 已经被加载，但没有Bean被实例化时触发    
+                1. ConfigurationClassPostProcessor：解析加了 @Configuration 的配置类，解析 @ComponentScan 注解扫描的包，以及解析 @Import 、@ImportResource 等注解
+            * BeanDefinitionRegistryPostProcessor(继承BeanFactoryPostProcessor,提供不同的方法)：所有Bean的定义信息即将被加载但未实例化时触发   
     * Dubbo 会在 Spring 实例例化完 bean 之后，在刷新容器器最后⼀一步发布 ContextRefreshEvent 事件的时候，通知实现了了  
     ApplicationListener 的 ServiceBean 类进⾏行行回调 onApplicationEvent 事件⽅方法，Dubbo 会在这个⽅方法中调⽤用 ServiceBean   
     ⽗父类ServiceConfig 的 export ⽅方法，⽽而该⽅方法真正实现了了服务的（异步或者⾮非异步）发布    
@@ -1076,5 +1109,61 @@
         - Context：可理解为应用，一个主机下有多个应用，一个应用中有多个 Servlet （可以简单理解为 webapps 中一个文件夹代表一个 Context ）
     * onRefresh()中初始化了tomcat,但是因为删除了ServiceConnectors，所以启动时只将所有组件给初始化,并未正在的启动
     * finishRefresh()中归还了Connector,并正在的启动
+12. 小问题
+    1.  BeanFactory 就是 IOC 容器，FactoryBean 是特殊的 Bean, 用来封装创建比较复杂的对象，而 ObjectFactory 主要用于延迟  
+    查找的场景，延迟实例化对象
+13. 设计模式
+    * 单例模式
+    * 工厂模式
+    * 装饰模式(Wrapper)
+    * 代理模式
+    * 观察者模式(ApplicationListener)
+    * 模版方法模式
     
     
+    
+# Redis
+1. 数据结构
+    - str,hash,list,set,zset
+    - 位图bitmap,位图不是特殊的数据结构，它的内容其实就是普通的字符串，也就是 byte 数组
+    - HyperLogLog 提供了两个指令 pfadd 和 pfcount，根据字面意义很好理解，一个是增加计数，一个是获取计数,能大概获取UV(今日去重访问人数)
+    - Geospatial 可以用来保存地理位置，并作位置距离计算或者根据半径计算位置等。
+    - Bloom Filter,一般都会在回答缓存穿透，或者海量数据去重这个时候引出来。它实际上是一个很长的二进制向量,然后一个值进来  
+    通过多个散列函数映射到二进制向量上令值为1,等查询时再次映射看几个点是否都为1
+2. 持久化
+    1. RDB,周期性持久化,直接写入数据，适合冷备份。因为是快照文件,默认5分钟一次,期间断电,会丢失数据。虽然同步数据时采用子线程  
+    fork操作持久化,但是若数据量特别大生成快照时还是会有秒级别的暂停
+    2. AOF,机制对每条写入命令作为日志,适合热备份。占用空间比较大,且比RDB写性能降低
+3. 从节点第一次启动连接master时,且为第一次连接master则会触发一个全量复制,slave拿到后立马写进本地磁盘,然后加载到内存,然后master  
+    把这段时间内新的操作数据(在内存中的)再发给slave
+4. redis过期策略
+    1. 定期好理解，默认100ms就随机抽一些设置了过期时间的key，去检查是否过期，过期了就删了.
+    2. 惰性删除，见名知意，惰性嘛，我不主动删，我懒，我等你来查询了我看看你过期没，过期就删了还不给你返回，没过期该怎么样就怎么样
+    3. 若定期没删,惰性也没去查怎么办?内存淘汰机制
+        - 尝试回收最少使用的键（LRU），使得新添加的数据有空间存放
+        - 尝试回收最少使用的键（LRU），但仅限于在过期集合的键,使得新添加的数据有空间存放
+        - 回收随机的键使得新添加的数据有空间存放
+        - 回收随机的键使得新添加的数据有空间存放，但仅限于在过期集合的键
+        - 报错
+5. 底层结构
+    * 结构
+        - String:动态字符串编码(SDS),优化内存分配的字符串编码,整数编码
+        - hash:散列表编码,压缩列表编码
+        - list:双向链表编码 ,压缩列表编码 
+        - set:散列表编码，整数集合编码
+        - zset:跳跃表编码,压缩列表编码
+    * 比如当我们的存储只有10个元素的列表，当使用双向链表数据结构时，必然需要维护大量的内部字段如每个元素需要:前置指针，  
+    后置指针，数据指针等，造成空间浪费，如果采用连续内存结构的压缩列表(ziplist)，将会节省大量内存，而由于数据长度较小，  
+    存取操作时间复杂度即使为O(n2)性能也可满足需求
+    * 首先在 Redis 内  部会使用一个 RedisObject 对象来表示所有的 key 和 value,其次 Redis 为了 平衡空间和时间效率，针对 value   
+    的具体类型在底层会采用不同的数据结构来实现
+    * SDS(Redis 的 SDS 和 C 中字符串相比有什么优势？)
+        1. 多增加 len 表示当前字符串的长度：这样就可以直接获取长度了，复杂度 O(1)
+        2. 自动扩展空间：当 SDS 需要对字符串进行修改时，首先借助于 len 和 alloc 检查空间是否满足修改所需的要求，  
+        如果空间不够的话，SDS 会自动扩展空间，避免了像 C 字符串操作中的覆盖情况
+        3. 有效降低内存分配次数：C 字符串在涉及增加或者清除操作时会改变底层数组的大小造成重新分配，SDS 使用了 空间预分配   
+        和 惰性空间释放 机制，简单理解就是每次在扩展时是成倍的多分配的，在缩容是也是先留着并不正式归还给 OS   
+        4. 二进制安全：C 语言字符串只能保存 ascii 码，对于图片、音频等信息无法保存，SDS 是二进制安全的，写入什么读取  
+        就是什么，不做任何过滤和限制
+    * 压缩列表:同整数集合一样压缩列表也不是基础数据结构，而是 Redis 自己设计的一种数据存储结构。它有点儿类似数组，通过一片连续的  
+    内存空间，来存储数据。不过，它跟数组不同的一点是，它允许存储的数据大小不同         
