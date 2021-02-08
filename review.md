@@ -384,6 +384,8 @@
     2. Mybatis 在处理#{}时，会将 sql 中的#{}替换为?号，调用 PreparedStatement 的 set 方法来赋值；
     3. Mybatis 在处理${}时，就是把${}替换成变量的值
     4. 使用#{}可以有效的防止 SQL 注入，提高系统安全性
+    5. 数据库接受到sql语句之后，需要词法和语义解析，优化sql语句，制定执行计划。这需要花费一些时间,如果每次都需要经过上面的  
+    词法语义解析、语句优化、制定执行计划等，则效率就明显不行了。为了解决上面的问题，于是就有了预编译
 
 ###netty
 1. 0拷贝
@@ -674,6 +676,12 @@
         * SERIALIZABLE(串行化)在第一个事务更新了某条记录后，就会给这条记录加锁，另一个事务再次更新时就需要等待第一个事务提交了，把锁释放之后才可以继续更新
     
 6. 服务器处理客户端请求过程 处理连接->查询缓存->语法解析->查询优化->存储引擎
+    * 连接管理/连接器:连接器就是用来客户端和服务器进程之间建立连接的,这个方式有很多,比如说TCP/IP,命名管道或共享内存等等,这个阶段的连接需要客户端提供主机信息,用户名以及密码,  
+    服务器会对提供的信息进行认证,不仅仅是账户密码的匹配,还有权限的验证
+    * 查询缓存:这个的意思的Mysql服务器程序处理请求,会把刚刚请求过的查询请求和结果缓存起来,,下一次有一模一样的请求过来,直接从缓存中查找结果会更快.参考3.1
+    * 语法解析:包括了词法分析,语法分析,语义分析等. 词法分析会分析出这条sql语句的关键词,表名和列名等等.语法分析则会分析这条sql语句是否有错误,比如关键字select是否正确等
+    * 查询优化:mysql会对我们写的sql语句进行一些优化,如外连接转换为内连接、表达式简化、子查询转为连接等,优化的结果就是生成一个执行计划,这个计划表名该sql语句会使用什么索引进行查询
+    * 执行:在真正开始执行前会判断当前用户是否有操作的权限,有的话会根据操作表的结构去存储引擎操作
 7. 字符编码解析过程
     1. 客户端使用操作系统的字符集编码发送字符串到mysql
     2. mysql根据配置character_set_client节码,转成character_set_connection(理解为mysql字符集)字符集  
@@ -1155,12 +1163,12 @@
     1.  BeanFactory 就是 IOC 容器，FactoryBean 是特殊的 Bean, 用来封装创建比较复杂的对象，而 ObjectFactory 主要用于延迟  
     查找的场景，延迟实例化对象
 13. 设计模式
-    * 单例模式
-    * 工厂模式
-    * 装饰模式(Wrapper)
-    * 代理模式
-    * 观察者模式(ApplicationListener)
-    * 模版方法模式
+    * 代理模式：在 AOP 中有使用
+    * 单例模式：bean 默认是单例模式
+    * 模板方法模式：jdbcTemplate
+    * 工厂模式：BeanFactory
+    * 观察者模式：Spring 事件驱动模型就是观察者模式很经典的一个应用，比如，ContextStartedEvent 就是 ApplicationContext 启动后触发的事件
+    * 适配器模式：Spring MVC 中也是用到了适配器模式适配 Controller
     
     
     
@@ -1211,3 +1219,128 @@
         就是什么，不做任何过滤和限制
     * 压缩列表:同整数集合一样压缩列表也不是基础数据结构，而是 Redis 自己设计的一种数据存储结构。它有点儿类似数组，通过一片连续的  
     内存空间，来存储数据。不过，它跟数组不同的一点是，它允许存储的数据大小不同         
+
+
+###  设计模式
+1. 分为三大类型(重要原则,对扩展开发，对修改封闭)
+    * 创建型模式(这一类设计模式的目的是用于创建对象):抽象工程模式,工厂方法模式,单例模式,构建模式,原型模式
+    * 结构型模式(这一类设计模式的目的是优化不同类、对象、接口之间的结构关系)代理模式,装饰者模式,组合模式,桥接模式,适配器模式,  
+    外观模式，享元模式
+    * 行为模式(这一类设计模式的目的是更好地实现类与类之间的交互以及算法的执行)策略模式,命令模式，状态模式,责任链模式,解释器模式,  
+    观察者模式,备忘录模式,迭代器模式,模板方法模式,访问者模式,中介者模式
+2. 单例模式
+    *. 如果单例初始值是null，还未构建，则构建单例对象并返回。这个写法属于单例模式当中的懒汉模式。如果单例对象一开始就被new Singleton()主动构建，  
+    则不再需要判空操作，这种写法属于饿汉模式  
+    ``` 
+     public class Signleton{
+                private Signletion(){};
+                private volation static Signleton instance = null;//禁止指令重排序
+                public static Signletion getInstance(){
+                    if(instance == null){
+                        synchroninzed(Signletion.class){
+                            if(instance == null){
+                                instance = new Signletion();
+                            }
+                        }
+                    }
+                }
+            }
+    ```
+    *. 可以使用枚举类来解决反射引起的重复创建对象
+3. 策略模式(解决if)
+    *. 父类抽象公共方法,子类实现重写,然后上下文类定义type,实例类,比较type方法,使用时静态代码块加载策略到list,循环可以执行所有方法,  
+    单独使用比较type,获取到对应实现类
+    ``` 
+    //定义策略接口
+    public interface DealStrategy{
+       void dealMythod(String option);
+    }
+    //定义具体的策略1
+    public class DealSina implements DealStrategy{
+       @override
+       public void dealMythod(String option){
+           //...
+      }
+    }
+    //定义具体的策略2
+    public class DealWeChat implements DealStrategy{
+       @override
+       public void dealMythod(String option){
+           //...
+      }
+    }
+    //定义上下文，负责使用DealStrategy角色
+    public static class DealContext{
+       private String type;
+       private DealStrategy deal;
+       public  DealContext(String type,DealStrategy deal){
+           this.type = type;
+           this.deal = deal;
+       }
+       public DealStrategy getDeal(){
+           return deal;
+       }
+       public boolean options(String type){
+           return this.type.equals(type);
+       }
+    }
+    
+    public void Share{
+       private static List<DealContext> algs = new ArrayList();
+       //静态代码块,先加载所有的策略
+       static {
+           algs.add(new DealContext("Sina",new DealSina()));
+           algs.add(new DealContext("WeChat",new DealWeChat()));
+      }
+    public void shareOptions(String type){
+           DealStrategy dealStrategy = null;
+           for (DealContext deal : algs) {
+               if (deal.options(type)) {
+                   dealStrategy = deal.getDeal();
+                   break;
+              }  
+          }
+           dealStrategy.dealMythod(type);
+      }
+    }
+    ```
+4. 观察者模式,是一种基于事件和响应的设计模式
+    * 生成观察抽象接口,定义一个更新观察者方法update,定义一个被观察者抽象类,里面包含实现子类列表,然后通知方法。被观察者基础抽象类,  
+    观察者实现接口
+    ```
+     //观察者
+     public interface Observer {
+         public void update();
+     }
+     //被观察者
+     abstract public class Subject {
+         private List<Observer> observerList = new ArrayList<Observer>();
+        //。。。。新增删除方法
+         public void notifyObservers(){
+             for (Observer observer: observerList){
+                 observer.update();
+             }
+         }
+     }
+     //观察者
+     public class Monster implements Observer {
+         @Override
+         public void update() {
+             if(inRange()){
+                 System.out.println("怪物 对主角攻击！");
+             }
+         }
+     }
+     //被观察者
+     public class Hero extends Subject{
+         void move(){
+             System.out.println("主角向前移动");
+             notifyObservers();
+         }
+     }
+     ```
+5. 代理模式
+    * 静态代理需要为每一个代理对象生成代理类,编译期间实现,动态代理采用反射动态生成代理类,运行期间实现
+6. 装饰器模式
+    
+    
