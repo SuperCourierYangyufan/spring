@@ -90,9 +90,21 @@
         - 代码中存在死循环或循环产生过多重复的对象实体
         - 内存设置过小
 14. JVM系统参数
-    1. jps -l 查看正在运行的java进程
-    
-    
+    1. jps -l ->查看正在运行的java进程
+    2. jinfo -flag 属性值 进程编号 ->查看某个属性是否被激活/jinfo -flags 进程编号
+    3. -XX: +PrintGCDetails 开启GC日志(+开启,-关闭)
+    4. -XX: MetaspaceSize=128m 设置元空间值
+    5. -XX: MaxTenuringThreshold=15 控制新生代需要经历多少次GC晋升到老年代中的最大阈值
+    6. -Xms == -XX: initialHeapSize 初始化堆内存
+    7. -Xmx == -XX: MaxHeapSize 最大堆内存 
+    8 java -XX: +PrintFlagInitial jvm初始化参数
+    9. java -XX: +PrintFlagsFinal 修改以后的参数
+    10 java -XX: +PrintCommandLineFlags -version 查看常用参数+垃圾回收器
+    11 -Xmn 年轻代,-Xss 每个线程堆栈大小
+15. GC详解(-XX: +PrintGCDetail)
+    *  Gc 新生区 ,Full GC 养老区
+    *  [GC[PSyoungGen:334480k->4736k(334848K)]597914K->270331K(1017536K),0.0209890 secs][Times:user=0.03 sys=0.00,real=0.02 secs] 
+    *  [[GC类型:youngGc前新生代内存->youngGc后新生代内存(新生代总大小)]GC前堆大小->GC后堆大小(JVM堆总大小),GC耗时[用户/系统/实际(GC耗时)]     
     
 ### 集合
 1.  List
@@ -466,7 +478,10 @@
         - 简述一下就是先检查配置，通过配置构建一个 map ，然后利用 map 来构建 URL ，再通过 URL 上的协议利用自适应扩展机制  
         调用对应的 protocol.refer 得到相应的 invoker 
         - 会先判断是否为本地引入
-        
+     * dubbo负载均衡策略
+     * dubbo的服务引用过程   
+     * hesson序列化底层
+     * zk崩溃恢复
         
         
 ### kafka
