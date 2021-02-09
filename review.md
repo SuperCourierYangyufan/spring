@@ -1350,5 +1350,127 @@
 5. 代理模式
     * 静态代理需要为每一个代理对象生成代理类,编译期间实现,动态代理采用反射动态生成代理类,运行期间实现
 6. 装饰器模式
+    * 生成装饰类,让需要装饰的接口通过构造函数传进来,重写方法,重写方法里面调用接口的方法,加上实现类
+    ``` 
+    public interface Car {
+        void run();
+    }
+    public class BenzCar implements Car{
+        @Override
+        public void run() {
+            System.out.println("奔驰开车了！");
+        }
+    }
+    public class CarDecorator implements Car {  //继承自Car接口，可以让每一个装饰器本身也可以被更外层的装饰器所包装，
+        protected Car decoratedCar;             //包装的方式就是把Car对象作为参数，传入到外层装饰器的构造函数当中。
+        public CarDecorator(Car decoratedCar){
+            this.decoratedCar = decoratedCar;
+        }
+        public void run(){
+            decoratedCar.run();
+        }
+    }
+    public class AutoCarDecorator extends CarDecorator {
+        public AutoCarDecorator(Car decoratedCar){
+            super(decoratedCar);
+        }
+        @Override
+        public void run(){
+            decoratedCar.run();
+            autoRun();
+        }
+        private void autoRun(){
+            System.out.println("开启自动驾驶");
+        }}
+    ```
+    * 装饰模式主要是强调对类中代码的拓展，而代理模式则偏向于委托类的访问限制，换句话 说，用代理模式，代理类（proxy class）  
+    可以对它的客户隐藏一个对象的具体信息。因此，当使用代理模式的时候，我们常常在一个代理类中创建一个对象的实例。  
+    并且，当我们使用装饰器模 式的时候，我们通常的做法是将原始对象作为一个参数传给装饰者的构造器。
+    * 以输入流为例，为了满足不同输入场景，JDK设计了多种多样的输入流，包括ByteArrayInputStream、FileInputStream等等,  
+    这些输入流都继承自共同的抽象类：InputStream,与此同时，为了给这些输入流带来功能上的扩展，JDK设计了一个装饰器类，  
+    FilterInputStream。该类继承自InputStream，并且“组合”了InputStream成员对象。
+7. 外观模式
+    * 定义一个大类，里面创建小的功能类,进行运行.想想肯德基的组合套餐
+    ``` 
+        public class SubSystemA {
+            public void methodA(){
+                System.out.println("执行方法A");
+            }
+        }
+        public class Facade {
+            public void comboMethodA(){
+                SubSystemA subSystemA = new SubSystemA();
+                SubSystemB subSystemB = new SubSystemB();
+                SubSystemD subSystemD = new SubSystemD();
+                subSystemA.methodA();
+                subSystemB.methodB();
+                subSystemD.methodD();
+            }
+            public void comboMethodB(){
+                SubSystemE subSystemE = new SubSystemE();
+                SubSystemD subSystemD = new SubSystemD();
+                SubSystemB subSystemB = new SubSystemB();
+                subSystemE.methodE();
+                subSystemD.methodD();
+                subSystemB.methodB();
+            }
+        }
+        
+        public class Client {
+            public static void main(String[] args) {
+                Facade facade = new Facade();
+                //通过外观模式，调用组合接口A
+                facade.comboMethodA();
+                //通过外观模式，调用组合接口B
+                facade.comboMethodB();
+            }
+    ```    
+8. 责任链模式
+    * 面对一个新任务，每个任务处理者需要判断自己能否处理该任务，如果能处理，则处理并返回；如果不能处理，则转交给下一个任务处理者，  
+    直到某一个任务处理者最终完成处理。这就是职责链模式的核心思想
+    ``` 
+    abstract public class Handler {
+        protected Handler successor;//每一个Handler对象都包含着一个successor成员，指向它的下一个任务处理者，就像链表节点的next指针一样。
+        public void setSuccessor(Handler successor) {
+            this.successor = successor;
+        }
+        abstract String handleRequest(String msg);
+    }
+    public class HandlerA extends Handler {
+        @Override
+        String handleRequest(String msg) {
+            if(msg.contains("a")){
+                msg = msg.replace('a', '*');
+            } else if(this.successor != null){
+                msg = this.successor.handleRequest(msg); //寻找下一个成员
+            }
+            return msg;
+        }
+    }
+
+    ```
+    * 当客户端对Web应用发出HTTP请求的时候，会首先经过Tomcat容器的一层层过滤器（Filter），过滤器会针对请求的访问权限、  
+    参数合法性等方面进行验证和过滤。这一层一层过滤器的实现，就使用了职责链模式。
+    * 在进入Controller层的业务逻辑之前，以及执行完业务逻辑之后，该请求都会经过一系列的拦截器（Interceptor）。  
+    这一系列拦截器的处理流程，也同样是职责链模式的实现
+9. 工厂模式
+    * 分为简单工厂模式,工厂方法模式,抽象工厂模式
+        - 简单工厂模式:简单工厂模式有唯一的工厂类，工厂类的创建方法根据传入的参数做if-else条件判断，决定最终创建什么样的产品对象
+        - 工厂方法模式:工厂方法模式由多个工厂类实现工厂接口，利用多态来创建不同的产品对象，从而避免了冗长的if-else条件判断
+        - 抽象工厂模式把产品子类进行分组，同组中的不同产品由同一个工厂子类的不同方法负责创建，从而减少了工厂子类的数量。
+    * 工厂方法模式就是创建工厂模式接口,里面创建工厂方法,不同实现类实现里面创建工厂方法
+    ``` 
+        public interface IMaskFactory {
+            IMask createMask();
+        }
+        public class HighEndFactory implements IMaskFactory{
+            @Override
+            public IMask createMask() {
+                IMask mask =  new HighEndMask(); //不同子类实现不同创建工厂方法
+                return mask;
+            }
+        }
+         
+    ```
     
     
