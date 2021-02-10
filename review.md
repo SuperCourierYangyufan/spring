@@ -479,6 +479,16 @@
         调用对应的 protocol.refer 得到相应的 invoker 
         - 会先判断是否为本地引入
      * dubbo负载均衡策略
+        - dubbo的负载均衡策略，主体向外暴露出来是一个接口，名字叫做loadBlace,抽象类为AbstractLoadBlance
+        - 核心方法为[<T> Invoker<T> select(List<Invoker<T>> invokers, URL url, Invocation invocation) throws RpcException;]
+        - 里面判断invokers,调用者集合,若为空返回空,若为一个直接返回第一个,若多个则调用doSelect(参数一致)
+        - 我们写不同的负载均衡策略便是重写不同的doSelect方法
+        - 默认自带算法一致性Hash均衡算法、随机调用法(默认)、轮询法、最少活动调用法
+        - 随机调用法:完全随机
+        - 轮询法:轮询调用并不是简单的一个接着一个依次调用，它是根据权重的值进行循环的
+        - 最少活动调用法:找到最少活跃数(在代码层反应就是：active的值)的调用者
+        - 一致性Hash均衡算法:需要配置参数hash.arguments(根据调用方法的那些参数生成key),hash.nodes:节点的副本数
+        - @Reference(loadbalance= "策略名")
      * dubbo的服务引用过程   
      * hesson序列化底层
      * zk崩溃恢复
