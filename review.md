@@ -77,6 +77,7 @@
     2. 当一个类收到了类加载请求，他首先不会尝试自己去加载这个类，而是把这个请求委派给父类去完成,父类不行才交付子类
     3. 好处是不管是哪个加载器加载这个类，最终都是委托给顶层的启动类加载器进行加载，这样就保证了使用不同的类加载器最终得  
     到的都是同样一个Object对象。
+    4. 怎么打破双亲委派模型?打破双亲委派机制则不仅要继承ClassLoader类，还要重写loadClass和findClass方法
 12. SafePoint
     * 比如 GC 的时候必须要等到 Java 线程都进入到 safepoint 的时候 VMThread 才能开始执行 GC
     * 比如
@@ -131,6 +132,12 @@
         - add()本质上是linkLast(),向链表最后添加一条数据
         - 可以作为一个队列使用(双向队列也可以),栈
         - 循环建议迭代器,get()方法,从头或尾部循环过来,迭代器一直指向下一个节点
+    3. CopyOnWriteArrayList
+        - 他的设计思想是:读写分离,最终一致,写时复制
+        - 它不能指定容量,初始容量是0.它底层也是一个数组,集合有多大,底层数组就有多大,不会有多余的空间
+        - 缺点底层是数组,删除插入的效率不高,写的时候需要复制,占用内存,浪费空间,如果集合足够大的时候容易触发GC
+        - 和vector相比,读大于写 用CopyOnWriteArrayList,写比较多Vector
+        
 2. Set
     1. HashSet,TreeSet(自己定义的类必须实现Comparable接口，并且覆写相应的compareTo()函数),LinkHashSet(基于LinkHashMap)
 3. Map
@@ -205,10 +212,10 @@
             - 如果你使⽤的是有界队列⽐⽅说ArrayBlockingQueue的话，任务⾸先会被添加到ArrayBlockingQueue中,ArrayBlockingQueue满了，  
             则会使⽤拒绝策略RejectedExecutionHandler处理满了的任务，默认是AbortPolicy。
     3. 拒绝任务,拒绝任务有两种情况：1. 线程池已经被关闭；2. 任务队列已满且maximumPoolSizes已满  
-        1. AbortPolicy：默认测策略，抛出RejectedExecutionException运行时异常
-        2. CallerRunsPolicy：这提供了一个简单的反馈控制机制，可以减慢提交新任务的速度
-        3. DiscardPolicy：直接丢弃新提交的任务
-        4. DiscardOldestPolicy：如果执行器没有关闭，队列头的任务将会被丢弃，然后执行器重新尝试执行任务
+         1. new ThreadPoolExecutor.DiscardPolicy()：丢弃掉该任务，不进行处理
+         2. new ThreadPoolExecutor.DiscardOldestPolicy()：丢弃队列里最近的一个任务，并执行当前任务
+         3. new ThreadPoolExecutor.AbortPolicy()：直接抛出 RejectedExecutionException 异常
+         4. new ThreadPoolExecutor.CallerRunsPolicy()：既不抛弃任务也不抛出异常，直接使用主线程来执行此任务
 3. 线程结束的方式
     1. 正常运行结束
     2. 外部设置标志内部判断跳出
@@ -639,8 +646,7 @@
     * NameServer的功能虽然非常重要，但是被设计得很轻量级，代码量少并且几乎无磁盘存储，所有的功能都通过内存高效完成
     * RocketMQ基于Netty对底层通信做了很好的抽象，使得通信功能逻辑清晰
 5. Broker是RocketMQ的核心,包括接受生产者消息,处理消费者请求、消息的持久化存储、消息的HA机制以及服务端过滤功能等
-    * 磁盘读写,顺序写速度可以达到600MB/s,而磁盘随机写的速度只有
-    大概lOOKB/s
+    * 磁盘读写,顺序写速度可以达到600MB/s,而磁盘随机写的速度只有大概lOOKB/s
     * RocketMQ消息的存储是由ConsumeQueue和CommitLog配合完成的
         - ConsumeQueue本质队列里面放的不是数据,而是个指针,指向的是物理存储地址，也就是CommitLog里面对应的数据
         - 在CommitLog中，一个消息的存储长度是不固定的，RocketMQ采取一些机制，尽量向CommitLog中顺序写，但是随机读
@@ -662,7 +668,14 @@
         - 设置Consumer的consumeMessageBatchMaxSize这个参数，默认是1，如果设置为N，在消息多的时候每次收到的是个长度为N的消息链表
         - 检测延时情况，跳过非重要消息
     * Consumer负载均衡默认五种,也可自己实现
-    
+9. 构成
+    1. Nameserver,无状态，动态列表；这也是和zookeeper的重要区别之一。zookeeper是有状态的。
+    2. Producer 消息生产者，负责发消息到Broker。
+    3. Broker 就是MQ本身，负责收发消息、持久化消息等。
+    4. Consumer 消息消费者，负责从Broker上拉取消息进行消费，消费完进行ack。
+10. 负载均衡
+    1. 生产者默认每个维护一个index,每次取节点递增,index取余broker,然后找到对应的broker存放消息,自带容错策略
+    2  消费者采用的是平均分配算法来进行负载均衡。
     
     
 ### 数据库
@@ -692,7 +705,7 @@
         1. Master Thread 主要负责将缓冲池中的数据异步刷新到磁盘中，除此之外还包括插入缓存、undo 页的回收等
         2. IO Thread 是负责读写 IO 的线程
         3. Purge(清除)Thread 主要用于回收事务已经提交了的 undo log
-        4. PagerCleanerThread 是新引入的一个用于协助 Master Thread 刷新脏页到磁盘的线程，它可以减轻 Master Thread 的工作压力，减少阻塞
+        4. PagerCleanerThread 是新引入的一个用于协助 Master 4 刷新脏页到磁盘的线程，它可以减轻 Master Thread 的工作压力，减少阻塞
     3. 存储文件:存储数据都是按表空间进行存放的，默认为共享表空间，存储的文件即为共享表空间文件（ibdata1)
 4. InnoDb逻辑存储结构主要包括表空间，段，区，页，行组成
     1. 表空间共有两种，一种是共享表空间，另一种是独占表空间共享表空间为ibdata1。如果设置了参数innodb_file_per_table,  
