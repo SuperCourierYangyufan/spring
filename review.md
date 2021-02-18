@@ -463,6 +463,14 @@
 8. socket
     1. Socket是什么？ socket通常称为“套接字”，用于描述IP地址和端口，是一个通信链的句柄。应用程序通过套接字向网络发出请求或应答网络请求
     2. 通信双方如何进行端口绑定?通常服务端启动时会绑定一个端口提供服务，而客户端在发起连接请求时会随机分配一个端口号
+9. 跨域 设置CorsConfiguration,设置Origin,Header,Method
+10. 设计模式6大原则
+    1. 开闭原则:对扩展开放，对修改关闭
+    2. 里氏代换原则:任何基类可以出现的地方，子类一定可以出现
+    3. 依赖倒转原则:针对接口编程，依赖于抽象而不依赖于具体
+    4. 接口隔离原则:使用多个隔离的接口，比使用单个接口要好
+    5. 迪米特法则，又称最少知道原则:一个实体应当尽量少地与其他实体之间发生相互作用，使得系统功能模块相对独立。
+    6. 合成复用原则:尽量使用合成/聚合的方式，而不是使用继承
         
 ###Mybatis
 1. 一级缓存
@@ -1011,7 +1019,7 @@
             - 校验并解析上传的文件,然后根据URL从拿到对应的对应HandlerMethod,其中读取时采用读锁,与上面写锁对应
             - 获取HandlerMethod进行拦截器处理,来判断是否能够匹配当前请求URL
             - 然后获取所有适配器来判断那个适配器能处理HandlerMethod返回HandlerAdapter
-            - 执行拦截器(springMVC拦截器功能就在此实现:HandlerIntercepto),如果拦截器返回true，代表继续向后执行剩余的拦截器；如果返回false，  
+            - 执行拦截器(springMVC拦截器功能就在此实现:HandlerInterceptorAdapter,WebMvcConfigurerAdapter),如果拦截器返回true，代表继续向后执行剩余的拦截器；如果返回false，  
             代表拦截器将该方法拦截，不执行后续的拦截器和 Controller 中的方法。
             - 正式执行HandlerAdapter.handle准备执行逻辑处理
             - 初始化Controller中一个WebDataBinder,来对这个控制器中的数据绑定器做定制修改。通常情况下我们不会操作WebDataBinder,
@@ -1023,9 +1031,9 @@
             - 然后反射调用Controller 里的方法。得到的结果寻找一个ReturnValueHandler匹配一个最合适的适配器,页面采用ViewNameMethodReturnValueHandler
             - 再然后包装一个根据已有信息包装一个ModelAndView 返回
             - 返回后来判断 header 中是否有 "Cache-Control" 来决定最后的跳转(默认不带,从而只设置一些缓存信息)
-            - 然后回调拦截器(HandlerIntercepto)的postHandle方法
+            - 然后回调拦截器(HandlerInterceptorAdapter)的postHandle方法
             - 然后根据ModelAndView判断是否有异常,如果有异常寻找合适的异常处理器返回,若没有则渲染视图
-            - 最后回调拦截器(HandlerIntercepto)的afterConcurrentHandlingStarted方法
+            - 最后回调拦截器(HandlerInterceptorAdapter)的afterConcurrentHandlingStarted方法
         * @ResponseBody响应json数据的原理:在对Controller结果进行处理时,不采用ViewNameMethodReturnValueHandler，而是使用 RequestResponseBodyMethodProcessor
     * 9大组件
         - 通过onRefresh方法初始化,初始了9个组件
