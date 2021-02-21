@@ -419,14 +419,20 @@
         - 多路复用IO:epoll使用一个文件描述符管理多个描述符，将用户关系的文件描述符的事件存放到内核的一个事件表中，  
         这样在用户空间和内核空间的copy只需一次
         - 异步 I/O
-6. servlet
-    * 生命周期
-        - init()方法仅执行一次init()方法，它是在服务器装入Servlet时执行的，可以配置服务器，以在启动服务器或客户机首次访问  
-        Servlet时装入Servlet
-        - service() 它是Servlet的核心，每当一个客户请求一个HttpServlet对象，该对象的Service()方法就要调用，而且传递给这个  
-        方法一个“请求”（ServletRequest）对象和一个“响应”（ServletResponse）对象作为参数
-        - destroy()方法,仅执行一次，在服务器端停止且卸载Servlet时执行该方法
-    * Servlet容器默认采用单实例多线程的方式来处理请求，这样减少产生Servlet实例的开销，提升了对请求的响应时间  
+6. web服务
+    - servlet
+        * 生命周期
+            - init()方法仅执行一次init()方法，它是在服务器装入Servlet时执行的，可以配置服务器，以在启动服务器或客户机首次访问  
+            Servlet时装入Servlet
+            - service() 它是Servlet的核心，每当一个客户请求一个HttpServlet对象，该对象的Service()方法就要调用，而且传递给这个  
+            方法一个“请求”（ServletRequest）对象和一个“响应”（ServletResponse）对象作为参数
+            - destroy()方法,仅执行一次，在服务器端停止且卸载Servlet时执行该方法
+        * Servlet容器默认采用单实例多线程的方式来处理请求，这样减少产生Servlet实例的开销，提升了对请求的响应时间  
+    - cookie and session
+        * cookie存在客户端,session存在服务端
+        * session 的工作原理是客户端登录完成之后，服务器会创建对应的 session，session创建完之后，会把session的id发送给客户端，  
+        客户端再存储到浏览器中。这样客户端每次访问服务器时，都会带着 sessionid，服务器拿到 sessionid之后，  
+        在内存找到与之对应的session这样就可以正常工作了
 7. Http
     *  Http与Https的区别
         1. HTTP 的URL 以http:// 开头，而HTTPS 的URL 以https:// 开头
