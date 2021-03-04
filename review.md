@@ -1680,3 +1680,22 @@
 6. IK分词器,默认有个词的树,以一个个字母或者汉字为单位,每个词就是一个节点,每个节点下面有可通的词,然后能走通代表为一个词,  
     然后句子进来一个个字的走判断词是否可达 
     
+    
+### springCloud
+1. 常用注解
+    1. @EnableEurekaServer 开启Eureka服务
+    2. @EnableEurekaClient 表明是一个Eureka客户端,@EnableDiscoveryClient同样的功能,只不过前者只能是Eureka,后者可以是其他注册中心
+    3. @LoadBalanced 开启负载均衡功能(客服端)
+    4. @EnableFeignClients 开启Feign的功能     
+    5. @FeignClient（"服务名"） 来指定调用哪个服务
+    6. @EnableZuulProxy 开启zuul的功能 
+    7. @EnableHystrix 开启Hystrix
+    8. @HystrixCommand(fallbackMethod ="熔断方法") 指定熔断方法
+    9. @EnableConfigServer 开启配置服务器的功能
+    10. @RefreshScope 刷新配置文件,实现热部署
+2. Eureka
+    - 当服务注册时,提供元数据,如IP,PORT,URL,主页等等
+    - 每隔30s一次心跳校验,90S会删除注册列表中超时服务
+    - 心跳校验还会将服务端的注册列表信息缓存至本地,会用该信息查询其他服务,每次心跳更新
+    - Eureka Client注册一个实例为什么这么慢?clint默认延迟40s注册,Eureka默认30s更新注册列表
+3. 
