@@ -106,10 +106,11 @@
     5. -XX: MaxTenuringThreshold=15 控制新生代需要经历多少次GC晋升到老年代中的最大阈值
     6. -Xms == -XX: initialHeapSize 初始化堆内存
     7. -Xmx == -XX: MaxHeapSize 最大堆内存 
-    8 java -XX: +PrintFlagInitial jvm初始化参数
+    8. java -XX: +PrintFlagInitial jvm初始化参数
     9. java -XX: +PrintFlagsFinal 修改以后的参数
-    10 java -XX: +PrintCommandLineFlags -version 查看常用参数+垃圾回收器
-    11 -Xmn 年轻代,-Xss 每个线程堆栈大小
+    10. java -XX: +PrintCommandLineFlags -version 查看常用参数+垃圾回收器
+    11. -Xmn 年轻代,-Xss 每个线程堆栈大小
+    12. 使用Arthas（阿尔萨斯）
 15. GC详解(-XX: +PrintGCDetail)
     *  Gc 新生区 ,Full GC 养老区
     *  [GC[PSyoungGen:334480k->4736k(334848K)]597914K->270331K(1017536K),0.0209890 secs][Times:user=0.03 sys=0.00,real=0.02 secs] 
@@ -136,7 +137,7 @@
         - 他的设计思想是:读写分离,最终一致,写时复制
         - 它不能指定容量,初始容量是0.它底层也是一个数组,集合有多大,底层数组就有多大,不会有多余的空间
         - 缺点底层是数组,删除插入的效率不高,写的时候需要复制,占用内存,浪费空间,如果集合足够大的时候容易触发GC
-        - 和vector相比,读大于写 用CopyOnWriteArrayList,写比较多Vector
+        - 和vector相比,读大于写 用CopyOnWriteArrayList,写比较多Vector(歪克特)
         
 2. Set
     1. HashSet,TreeSet(自己定义的类必须实现Comparable接口，并且覆写相应的compareTo()函数),LinkHashSet(基于LinkHashMap)
