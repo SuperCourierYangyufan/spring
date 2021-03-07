@@ -1684,7 +1684,7 @@
 ### springCloud
 1. 常用注解
     1. @EnableEurekaServer 开启Eureka服务
-    2. @EnableEurekaClient 表明是一个Eureka客户端,@EnableDiscoveryClient同样的功能,只不过前者只能是Eureka,后者可以是其他注册中心
+    2. @EnableEurekaClient 表明是一个Eureka客户端,@EnableDiscoveryClient(d s 噶 be ru)同样的功能,只不过前者只能是Eureka,后者可以是其他注册中心
     3. @LoadBalanced 开启负载均衡功能(客服端)
     4. @EnableFeignClients 开启Feign的功能     
     5. @FeignClient（"服务名"） 来指定调用哪个服务
@@ -1693,9 +1693,29 @@
     8. @HystrixCommand(fallbackMethod ="熔断方法") 指定熔断方法
     9. @EnableConfigServer 开启配置服务器的功能
     10. @RefreshScope 刷新配置文件,实现热部署
-2. Eureka
+2. RestTemplate 是从 Spring3.0 开始支持的一个 HTTP 请求工具，它提供了常见的REST请求方案的模版例如 GET 请求、POST 请求、  
+PUT 请求、DELETE 请求以及一些通用的请求执行方法 exchange 以及 execute   
+3. Eureka(服务注册于发现。)
     - 当服务注册时,提供元数据,如IP,PORT,URL,主页等等
     - 每隔30s一次心跳校验,90S会删除注册列表中超时服务
     - 心跳校验还会将服务端的注册列表信息缓存至本地,会用该信息查询其他服务,每次心跳更新
     - Eureka Client注册一个实例为什么这么慢?clint默认延迟40s注册,Eureka默认30s更新注册列表
-3. 
+    - zk区别   eureka保证AP,ZK保证CP(C 一致性,A 可用性 P 分区容错性)
+4. Fetch(基于动态代理机制，根据注解和选择的机器，拼接请求 url 地址，发起请求)
+    - 流程
+        1. 通过@EnableFetchClients开启Fetch,根据规则,配置@FetchClient注解
+        2. Spring启动流程中会扫描@FetchClient的注解,并将这些类装入IOC容器中
+        3. 当请求FetchClient的方法时,会被拦截,拦截类为ReflectiveFetch(r fi de fan qi)
+        4. 然后转交到SynchronousMethodHandler类进行拦截的处理,当被拦截会根据参数生成RequestTemplate对象,该对象就是Http的请求模板
+        5. RequesTemplate在生成Request
+        6. Request交给Client去处理，其中Client可以是HttpUrlConnection、HttpClient也可以是Okhttp
+        7. 后Client被封装到LoadBalanceClient类，这个类结合类Ribbon做到了负载均衡。
+5. Ribbon(实现负载均衡，从一个服务的多台机器中选择一台)
+    - Ribbon的负载均衡，主要通过LoadBalancerClient来实现的
+    - LoadBalancerClient具体交给了ILoadBalancer来处理，ILoadBalancer通过配置IRule、IPing等信息，并向EurekaClient获取注册列表的信息
+    - 并默认10秒一次向EurekaClient发送“ping”,进而检查是否更新服务列表，最后，得到注册列表后，ILoadBalancer根据IRule的策略进行负载均衡。
+    - 而RestTemplate 被@LoadBalance注解后，能过用负载均衡
+    - 主要是维护了一个被@LoadBalance注解的RestTemplate列表，并给列表中的RestTemplate添加拦截器，进而交给负载均衡器去处理
+6. Hystrix(提供线程池，不同的服务走不同的线程池，实现了不同服务调用的隔离，避免了服务雪崩的问题,熔断)
+7. Zuul(网关管理，由 Zuul 网关转发请求给对应的服务)
+       
