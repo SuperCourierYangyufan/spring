@@ -1697,11 +1697,20 @@
 2. RestTemplate 是从 Spring3.0 开始支持的一个 HTTP 请求工具，它提供了常见的REST请求方案的模版例如 GET 请求、POST 请求、  
 PUT 请求、DELETE 请求以及一些通用的请求执行方法 exchange 以及 execute   
 3. Eureka(服务注册于发现。)
-    - 当服务注册时,提供元数据,如IP,PORT,URL,主页等等
-    - 每隔30s一次心跳校验,90S会删除注册列表中超时服务
-    - 心跳校验还会将服务端的注册列表信息缓存至本地,会用该信息查询其他服务,每次心跳更新
-    - Eureka Client注册一个实例为什么这么慢?clint默认延迟40s注册,Eureka默认30s更新注册列表
-    - zk区别   eureka保证AP,ZK保证CP(C 一致性,A 可用性 P 分区容错性)
+    * 特点
+        - 当服务注册时,提供元数据,如IP,PORT,URL,主页等等
+        - 每隔30s一次心跳校验,90S会删除注册列表中超时服务
+        - 心跳校验还会将服务端的注册列表信息缓存至本地,会用该信息查询其他服务,每次心跳更新
+        - Eureka Client注册一个实例为什么这么慢?clint默认延迟40s注册,Eureka默认30s更新注册列表
+        - zk区别   eureka保证AP,ZK保证CP(C 一致性,A 可用性 P 分区容错性)
+        - 每隔10分钟同步一次集群节点,底层通过借助线程池完成定时任务,底层来更新节点信息
+    * 源码
+        1. @EnableEurekaServer内部@Import(EurekaServerMarkerConfiguration),EurekaServerMarkerConfiguration内部只是简单new了个空的mark
+        2. spring.factory SPI加载EurekaServerAutoConfiguration,初始化需要@ConditionalOnBean(EurekaServerMarkerConfiguration.Marker.class)
+        3. 所以这个空的mark只是标记,有了它才能执行在SPI加载EurekaServerAutoConfiguration上@Import(EurekaServerInitializerConfiguration.class)
+        4. EurekaServerInitializerConfiguration中为核心方法start,其中启动一个新线程,初始化,启动EurekaService,发布Eureka已注册的事件,  
+        修改 EurekaServer 的运行状态,发布Eureka已启动的事件
+        
 4. Fetch(基于动态代理机制，根据注解和选择的机器，拼接请求 url 地址，发起请求)
     - 流程
         1. 通过@EnableFetchClients开启Fetch,根据规则,配置@FetchClient注解
