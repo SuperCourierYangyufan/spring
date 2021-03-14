@@ -1682,7 +1682,7 @@
     然后句子进来一个个字的走判断词是否可达 
     
     
-### springCloud
+### springCloudNetflix 
 1. 常用注解
     1. @EnableEurekaServer 开启Eureka服务
     2. @EnableEurekaClient 表明是一个Eureka客户端,@EnableDiscoveryClient(d s 噶 be ru)同样的功能,只不过前者只能是Eureka,后者可以是其他注册中心
@@ -1694,6 +1694,7 @@
     8. @HystrixCommand(fallbackMethod ="熔断方法") 指定熔断方法
     9. @EnableConfigServer 开启配置服务器的功能
     10. @RefreshScope 刷新配置文件,实现热部署
+    11. @DefaultProperties(defaultFallback="") 全局配置降级方法
 2. RestTemplate 是从 Spring3.0 开始支持的一个 HTTP 请求工具，它提供了常见的REST请求方案的模版例如 GET 请求、POST 请求、  
 PUT 请求、DELETE 请求以及一些通用的请求执行方法 exchange 以及 execute   
 3. Eureka(服务注册于发现。)
@@ -1702,7 +1703,8 @@ PUT 请求、DELETE 请求以及一些通用的请求执行方法 exchange 以�
         - 每隔30s一次心跳校验,90S会删除注册列表中超时服务
         - 心跳校验还会将服务端的注册列表信息缓存至本地,会用该信息查询其他服务,每次心跳更新
         - Eureka Client注册一个实例为什么这么慢?clint默认延迟40s注册,Eureka默认30s更新注册列表
-        - zk区别   eureka保证AP,ZK保证CP(C 一致性,A 可用性 P 分区容错性)
+        - zk区别   eureka保证AP,ZK保证CP(C 一致性,A 可用性 P 分区容错性),zk为master写,从节点读,虽然每个客户端连接到任意节点  
+        都一样,但是连接到从节点,写操作同步给master节点才能返回,而Eureka则是每个一样,所以需要同步操作,继而没办法满足数据一致性
         - 每隔10分钟同步一次集群节点,底层通过借助线程池完成定时任务,底层来更新节点信息
     * 源码
         1. @EnableEurekaServer内部@Import(EurekaServerMarkerConfiguration),EurekaServerMarkerConfiguration内部只是简单new了个空的mark
@@ -1720,12 +1722,24 @@ PUT 请求、DELETE 请求以及一些通用的请求执行方法 exchange 以�
         5. RequesTemplate在生成Request
         6. Request交给Client去处理，其中Client可以是HttpUrlConnection、HttpClient也可以是Okhttp
         7. 后Client被封装到LoadBalanceClient类，这个类结合类Ribbon做到了负载均衡。
+    - 特点
+        1. feign客户端默认超时时间是1秒，超时就出现异常,可以设置建立连接所用时间,和建立连接后读取资源时间
 5. Ribbon(实现负载均衡，从一个服务的多台机器中选择一台)
     - Ribbon的负载均衡，主要通过LoadBalancerClient来实现的
-    - LoadBalancerClient具体交给了ILoadBalancer来处理，ILoadBalancer通过配置IRule、IPing等信息，并向EurekaClient获取注册列表的信息
+    - LoadBalancerClient具体交给了ILoadBalancer来处理，ILoadBalancer通过配置IRule(核心Choose方法,用来选择一个实列)、IPing等信息，并向EurekaClient获取注册列表的信息
     - 并默认10秒一次向EurekaClient发送“ping”,进而检查是否更新服务列表，最后，得到注册列表后，ILoadBalancer根据IRule的策略进行负载均衡。
     - 而RestTemplate 被@LoadBalance注解后，能过用负载均衡
     - 主要是维护了一个被@LoadBalance注解的RestTemplate列表，并给列表中的RestTemplate添加拦截器，进而交给负载均衡器去处理
 6. Hystrix(提供线程池，不同的服务走不同的线程池，实现了不同服务调用的隔离，避免了服务雪崩的问题,熔断)
+    1. 特点
+        - 主要关注的三个参数
+            1. circuitBreaker.sleepWindowInMilliseconds 断路器的快照时间窗，也叫做窗口期。可以理解为一个触发断路器的周期时间值，默认为10秒
+            2. circuitBreaker.requestVolumeThreshold 断路器的窗口期内触发断路的请求阈值，默认为20。换句话说，假如某个窗口期内的请求总数都  
+            不到该配置值，那么断路器连发生的资格都没有。断路器在该窗口期内将不会被打开。
+            3. circuitBreaker.errorThresholdPercentage 断路器的窗口期内能够容忍的错误百分比阈值，默认为50（也就是说默认容忍50%的错误率）。  
+            打个比方，假如一个窗口期内，发生了100次服务请求，其中50次出现了错误。在这样的情况下，断路器将会被打开。在该窗口期结束之前，  
+            即使第51次请求没有发生异常，也将被执行fallback逻辑。
+            4. 综上所述，在以上三个参数缺省的情况下，Hystrix断路器触发的默认策略为:[在10秒内，发生20次以上的请求时，假如错误率达到50%以上，  则断路器将被打开。（当一个窗口期过去的时候，断路器将变成半开（HALF-OPEN）状态，如果这时候发生的请求正常，则关闭，否则又打开）]
 7. Zuul(网关管理，由 Zuul 网关转发请求给对应的服务)
+8. ConfigServer(集中式的分布式配置中心)
        
