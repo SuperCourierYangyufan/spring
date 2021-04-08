@@ -1706,13 +1706,39 @@ PUT 请求、DELETE 请求以及一些通用的请求执行方法 exchange 以�
         - zk区别   eureka保证AP,ZK保证CP(C 一致性,A 可用性 P 分区容错性),zk为master写,从节点读,虽然每个客户端连接到任意节点  
         都一样,但是连接到从节点,写操作同步给master节点才能返回,而Eureka则是每个一样,所以需要同步操作,继而没办法满足数据一致性
         - 每隔10分钟同步一次集群节点,底层通过借助线程池完成定时任务,底层来更新节点信息
-    * 源码
+    * 注册中心源码
         1. @EnableEurekaServer内部@Import(EurekaServerMarkerConfiguration),EurekaServerMarkerConfiguration内部只是简单new了个空的mark
         2. spring.factory SPI加载EurekaServerAutoConfiguration,初始化需要@ConditionalOnBean(EurekaServerMarkerConfiguration.Marker.class)
         3. 所以这个空的mark只是标记,有了它才能执行在SPI加载EurekaServerAutoConfiguration上@Import(EurekaServerInitializerConfiguration.class)
         4. EurekaServerInitializerConfiguration中为核心方法start,其中启动一个新线程,初始化,启动EurekaService,发布Eureka已注册的事件,  
         修改 EurekaServer 的运行状态,发布Eureka已启动的事件
-        
+    * 服务注册源码
+        1. EurekaClientAutoConfiguration类,上AutoConfigureAfter内有三个需要先初始化的bean
+            - RefreshAutoConfiguration->ConditionalOnClass(RefreshScope.class) 做类动态刷新
+            - AutoServiceRegistrationAutoConfiguration 负责与分布式配置中心配合，完成应用配置的刷新
+            - EurekaDiscoveryClientConfiguration 它将 SpringBoot 原生有的应用健康状态检查同步到 SpringCloud 的 EurekaClient 上，  
+            并同步给 EurekaServer ，让 EurekaServer 也能感知到每个服务自身的应用健康状态
+        2.  @Import(DiscoveryClientOptionalArgsConfiguration.class)
+            - RestTemplateDiscoveryClientOptionalArgs->EurekaClient 在设计与 EurekaServer 通信时,默认使用Jersey,可以用RestTemplate替代
+            - EurekaInstanceConfigBean->是封装 EurekaClient 相关的一些配置项
+            - EurekaServiceRegistry->微服务实例与注册中心的连接契约(租约)
+            - EurekaAutoServiceRegistration->负责调 EurekaServiceRegistry 的 register 方法实现服务注册
+            - RefreshableEurekaClientConfiguration.CloudEurekaClient(核心,启动源)
+                1. 填充组件到DiscoveryClient中,如心跳,预注册逻辑的处理程序,使用本地IPv4地址哈希作为种子随机化服务器列表
+                2. 应用列表的本地缓存,每一个微服务应用实例化成一个Applications,微服务实例在初始化后会定时从注册中心获取已经注册  
+                的服务和实例列表，以备在注册中心宕机时仍能利用本地缓存向远程服务实例发起通信
+                3. 区域注册信息，涉及到 Eureka 的服务分区特性
+                4. 初始化远程同步注册表、心跳监控的组件
+                5. 不注册到注册中心的分支处理
+                6. 初始化定时任务的线程池和定时任务执行器，大小为 2，为两个定时器做准备,心跳定时器,缓存定时器
+                7. 初始化通信网关
+                8. 初始化微服务实例区域检查器
+                9. 拉取注册信息
+                10. 回调注册前置处理器
+                11. 初始化定时任务
+                12. 向Servo监控注册自己
+                13. 注册完成
+            
 4. Fetch(基于动态代理机制，根据注解和选择的机器，拼接请求 url 地址，发起请求)
     - 流程
         1. 通过@EnableFetchClients开启Fetch,根据规则,配置@FetchClient注解
