@@ -478,6 +478,10 @@
     4. 接口隔离原则:使用多个隔离的接口，比使用单个接口要好
     5. 迪米特法则，又称最少知道原则:一个实体应当尽量少地与其他实体之间发生相互作用，使得系统功能模块相对独立。
     6. 合成复用原则:尽量使用合成/聚合的方式，而不是使用继承
+11. base理论
+    1. 基本可用,允许可用性降低(响应延长,服务降级)
+    2. 软状态,允许系统中的数据存在中间状态,并认为该中间状态不会影响系统整体可用性
+    3. 最终一致性
         
 ###Mybatis
 1. 一级缓存
@@ -1706,6 +1710,8 @@ PUT 请求、DELETE 请求以及一些通用的请求执行方法 exchange 以�
         - zk区别   eureka保证AP,ZK保证CP(C 一致性,A 可用性 P 分区容错性),zk为master写,从节点读,虽然每个客户端连接到任意节点  
         都一样,但是连接到从节点,写操作同步给master节点才能返回,而Eureka则是每个一样,所以需要同步操作,继而没办法满足数据一致性
         - 每隔10分钟同步一次集群节点,底层通过借助线程池完成定时任务,底层来更新节点信息
+        - (Eureka自我保护)运行期间统计15分钟内失败比例是否低于85%,若低于则不会让实例过期,同时提出一个警告
+        - (优雅停服)actuator依赖,配置shutdown端点
     * 源码
         1. @EnableEurekaServer内部@Import(EurekaServerMarkerConfiguration),EurekaServerMarkerConfiguration内部只是简单new了个空的mark
         2. spring.factory SPI加载EurekaServerAutoConfiguration,初始化需要@ConditionalOnBean(EurekaServerMarkerConfiguration.Marker.class)
