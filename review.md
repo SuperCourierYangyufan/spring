@@ -1706,38 +1706,24 @@ PUT 请求、DELETE 请求以及一些通用的请求执行方法 exchange 以�
         - zk区别   eureka保证AP,ZK保证CP(C 一致性,A 可用性 P 分区容错性),zk为master写,从节点读,虽然每个客户端连接到任意节点  
         都一样,但是连接到从节点,写操作同步给master节点才能返回,而Eureka则是每个一样,所以需要同步操作,继而没办法满足数据一致性
         - 每隔10分钟同步一次集群节点,底层通过借助线程池完成定时任务,底层来更新节点信息
-    * 注册中心源码
+        - Eureka高可用本质上就是将自己注册到别的注册中心上
+        - Eureka分区概念,Region->Zone(1对多),理解为武汉(Region)下有汉阳机房(Zone)和武昌机房,消费端获取到对应Region下的Zone后,
+        通过Zone获取到对应的ServiceUrls(服务列表地址),Ribbon默认访问同一个Zone下面的服务
+    * 注册中心启动源码
         1. @EnableEurekaServer内部@Import(EurekaServerMarkerConfiguration),EurekaServerMarkerConfiguration内部只是简单new了个空的mark
         2. spring.factory SPI加载EurekaServerAutoConfiguration,初始化需要@ConditionalOnBean(EurekaServerMarkerConfiguration.Marker.class)
         3. 所以这个空的mark只是标记,有了它才能执行在SPI加载EurekaServerAutoConfiguration上@Import(EurekaServerInitializerConfiguration.class)
         4. EurekaServerInitializerConfiguration中为核心方法start,其中启动一个新线程,初始化,启动EurekaService,发布Eureka已注册的事件,  
         修改 EurekaServer 的运行状态,发布Eureka已启动的事件
-    * 服务注册源码
-        1. EurekaClientAutoConfiguration类,上AutoConfigureAfter内有三个需要先初始化的bean
-            - RefreshAutoConfiguration->ConditionalOnClass(RefreshScope.class) 做类动态刷新
-            - AutoServiceRegistrationAutoConfiguration 负责与分布式配置中心配合，完成应用配置的刷新
-            - EurekaDiscoveryClientConfiguration 它将 SpringBoot 原生有的应用健康状态检查同步到 SpringCloud 的 EurekaClient 上，  
-            并同步给 EurekaServer ，让 EurekaServer 也能感知到每个服务自身的应用健康状态
-        2.  @Import(DiscoveryClientOptionalArgsConfiguration.class)
-            - RestTemplateDiscoveryClientOptionalArgs->EurekaClient 在设计与 EurekaServer 通信时,默认使用Jersey,可以用RestTemplate替代
-            - EurekaInstanceConfigBean->是封装 EurekaClient 相关的一些配置项
-            - EurekaServiceRegistry->微服务实例与注册中心的连接契约(租约)
-            - EurekaAutoServiceRegistration->负责调 EurekaServiceRegistry 的 register 方法实现服务注册
-            - RefreshableEurekaClientConfiguration.CloudEurekaClient(核心,启动源)
-                1. 填充组件到DiscoveryClient中,如心跳,预注册逻辑的处理程序,使用本地IPv4地址哈希作为种子随机化服务器列表
-                2. 应用列表的本地缓存,每一个微服务应用实例化成一个Applications,微服务实例在初始化后会定时从注册中心获取已经注册  
-                的服务和实例列表，以备在注册中心宕机时仍能利用本地缓存向远程服务实例发起通信
-                3. 区域注册信息，涉及到 Eureka 的服务分区特性
-                4. 初始化远程同步注册表、心跳监控的组件
-                5. 不注册到注册中心的分支处理
-                6. 初始化定时任务的线程池和定时任务执行器，大小为 2，为两个定时器做准备,心跳定时器,缓存定时器
-                7. 初始化通信网关
-                8. 初始化微服务实例区域检查器
-                9. 拉取注册信息
-                10. 回调注册前置处理器
-                11. 初始化定时任务
-                12. 向Servo监控注册自己
-                13. 注册完成
+    * 服务注册,续约,获取源码
+            1. EnableEurekaClient->EurekaClient构造方法->initScheduledTasks()->创建线程(InstanceInfoReplicator)->run()-> discoveryClient.register()
+            2. register是通过Rest请求方式实现,而register传入的参数为InstanceInfo对象,该对象就是注册给客户端的元数据,包含名称,ip,port....  
+            可以通过eureka.instance.metadataMap.<key> = <value>格式来配置
+            3. initScheduledTasks下创建了三个线程,除了上述的注册,还有服务获取,服务续约
+            4. 服务续约依旧是通过run->renew()->rest请求
+            5. 服务获取run->refreshRegistry->会判断是否为第一次获取发起不同的Rest请求和相应的处理
+                - 第一次全量更新,获取信息默认都采用jersey构建的restful请求
+                - 后面采用局部更新,先获取增量数据,为空则获取全量,否则更新,最后与注册中心比对appsHashcode
             
 4. Fetch(基于动态代理机制，根据注解和选择的机器，拼接请求 url 地址，发起请求)
     - 流程
@@ -1751,13 +1737,16 @@ PUT 请求、DELETE 请求以及一些通用的请求执行方法 exchange 以�
     - 特点
         1. feign客户端默认超时时间是1秒，超时就出现异常,可以设置建立连接所用时间,和建立连接后读取资源时间
 5. Ribbon(实现负载均衡，从一个服务的多台机器中选择一台)
-    - Ribbon的负载均衡，主要通过LoadBalancerClient来实现的
-    - LoadBalancerClient具体交给了ILoadBalancer来处理，ILoadBalancer通过配置IRule(核心Choose方法,用来选择一个实列)、IPing等信息，并向EurekaClient获取注册列表的信息
-    - 并默认10秒一次向EurekaClient发送“ping”,进而检查是否更新服务列表，最后，得到注册列表后，ILoadBalancer根据IRule的策略进行负载均衡。
-    - 而RestTemplate 被@LoadBalance注解后，能过用负载均衡
-    - 主要是维护了一个被@LoadBalance注解的RestTemplate列表，并给列表中的RestTemplate添加拦截器，进而交给负载均衡器去处理
+    * 基本流程
+        - Ribbon的负载均衡，主要通过LoadBalancerClient来实现的
+        - LoadBalancerClient具体交给了ILoadBalancer来处理，ILoadBalancer通过配置IRule(核心Choose方法,用来选择一个实列)、IPing等信息，并向EurekaClient获取注册列表的信息
+        - 并默认10秒一次向EurekaClient发送“ping”,进而检查是否更新服务列表，最后，得到注册列表后，ILoadBalancer根据IRule的策略进行负载均衡。
+        - 而RestTemplate 被@LoadBalance注解后，能过用负载均衡
+        - 主要是维护了一个被@LoadBalance注解的RestTemplate列表，并给列表中的RestTemplate添加拦截器，进而交给负载均衡器去处理
+    * 特点
+        - Ribbon的服务清单会被Eureka重写,IPing也会被重写替代    
 6. Hystrix(提供线程池，不同的服务走不同的线程池，实现了不同服务调用的隔离，避免了服务雪崩的问题,熔断)
-    1. 特点
+    * 特点
         - 主要关注的三个参数
             1. circuitBreaker.sleepWindowInMilliseconds 断路器的快照时间窗，也叫做窗口期。可以理解为一个触发断路器的周期时间值，默认为10秒
             2. circuitBreaker.requestVolumeThreshold 断路器的窗口期内触发断路的请求阈值，默认为20。换句话说，假如某个窗口期内的请求总数都  
@@ -1766,6 +1755,16 @@ PUT 请求、DELETE 请求以及一些通用的请求执行方法 exchange 以�
             打个比方，假如一个窗口期内，发生了100次服务请求，其中50次出现了错误。在这样的情况下，断路器将会被打开。在该窗口期结束之前，  
             即使第51次请求没有发生异常，也将被执行fallback逻辑。
             4. 综上所述，在以上三个参数缺省的情况下，Hystrix断路器触发的默认策略为:[在10秒内，发生20次以上的请求时，假如错误率达到50%以上，  则断路器将被打开。（当一个窗口期过去的时候，断路器将变成半开（HALF-OPEN）状态，如果这时候发生的请求正常，则关闭，否则又打开）]
+    * 简单流程
+            1. 构造一个 HystrixCommand或HystrixObservableCommand对象，用于封装请求，并在构造方法配置请求被执行需要的参数
+            2. 执行命令，Hystrix提供了4种执行命令的方法
+            3. 判断是否使用缓存响应请求，若启用了缓存，且缓存可用，直接使用缓存响应请求。Hystrix支持请求缓存，但需要用户自定义启动
+            4. 判断熔断器是否打开，如果打开，跳到第8步
+            5. 判断线程池/队列/信号量是否已满，已满则跳到第8步；
+            6. 执行HystrixObservableCommand.construct()或HystrixCommand.run()，如果执行失败或者超时，跳到第8步；否则，跳到第9步
+            7. 统计熔断器监控指标
+            8. 走Fallback备用逻辑
+            9. 返回请求响应    
 7. Zuul(网关管理，由 Zuul 网关转发请求给对应的服务)
 8. ConfigServer(集中式的分布式配置中心)
        
