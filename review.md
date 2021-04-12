@@ -1668,6 +1668,7 @@
     深翻页的原因,因为后面from增大,需要查询的数据越多
     3. 然后这个队列只有存有id,然后根据size,取出list优先大小为size的id,发送到对应shard中,然后拉取相应数据,然后返回 
     4. ES为了避免深度分页带来的内存开销，ES默认限定只能查询10000个文档
+    5. 查询节点时,默认采用轮询,但是节点并不一定使用该节点查询,有可能协调到其他节点的分片上
 4. Es更新和删除过程
     1. 删除和更新也都是写操作，但是Elasticsearch中的文档是不可变的，因此不能被删除或者改动以展示其变更
     2. 磁盘上的每个段都有一个相应的.del文件。当删除请求发送后，文档并没有真的被删除，而是在.del文件中被标记为删除。  
@@ -1687,7 +1688,7 @@
 7. 映射 Es->mysql;Index->dataBase;Type->table(6.x 一个index只有一个Type,7.x不存在);Document->Row;Fields->Column
 8. RestHighLevelClient为Es客户端连接GetIndexRequest(索引创建),IndexRequest(新增),UpdateRequest(修改),GetRequest(id获取),    
     DeleteRequest(删除)，SearchRequest(复杂查询)相应操作    
-    
+9. 主节点在初始化后不能新增分片,扩容可以增加备份分片    
 ### springCloudNetflix 
 1. 常用注解
     1. @EnableEurekaServer 开启Eureka服务
