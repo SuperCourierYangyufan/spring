@@ -1724,7 +1724,9 @@
     10. @RefreshScope 刷新配置文件,实现热部署
     11. @DefaultProperties(defaultFallback="") 全局配置降级方法
 2. RestTemplate 是从 Spring3.0 开始支持的一个 HTTP 请求工具，它提供了常见的REST请求方案的模版例如 GET 请求、POST 请求、  
-PUT 请求、DELETE 请求以及一些通用的请求执行方法 exchange 以及 execute   
+PUT 请求、DELETE 请求以及一些通用的请求执行方法 exchange 以及 execute
+    - 默认 get,post等等都会execute->doExecute ->createRequest,通过RequestFactory来创建ClientHttpRequest,默认采用SimpleClientHttpRequestFactory  
+    实现类,而当使用Ribbon后,会换成RibbonClientHttpRequestFactory,这样创建出来的请求就是被负载均衡处理过的请求，也就相当于实现了客户端调用的负载均衡
 3. Eureka(服务注册于发现。)
     * 特点
         - 当服务注册时,提供元数据,如IP,PORT,URL,主页等等
@@ -1774,7 +1776,23 @@ PUT 请求、DELETE 请求以及一些通用的请求执行方法 exchange 以�
         - 而RestTemplate 被@LoadBalance注解后，能过用负载均衡
         - 主要是维护了一个被@LoadBalance注解的RestTemplate列表，并给列表中的RestTemplate添加拦截器，进而交给负载均衡器去处理
     * 特点
-        - Ribbon的服务清单会被Eureka重写,IPing也会被重写替代    
+        - Ribbon 的负载均衡思路，就是在发请求之前用拦截器先截住，替换 url 后再发请求
+        - 默认ILoadBalancer为顶级接口,BaseLoadBalancer为Ribbon的默认实现,而cloud则重写,用ZoneAwareLoadBalancer
+        - 默认采用IPing,每10s线性遍历所有服务实例。IRule默认采用线性负载均衡策略
+        - 而Eureka和Ribbon整合采用了RibbonEurekaAutoConfiguration类
+            - 重写Ping方法为NIWSDiscoveryPing,ping 依据来源是 EurekaServer 的注册信息
+    * 源码
+        1. LoadBalancerClient
+            1. choose 根据传入的服务名,从负载均衡器中挑选一个对应服务的实例
+            2. execute 从负载均衡器中挑选出的服务实例来执行请求内容
+            3. reconstructURI 拼接出合适的host:port形式的URI    
+        2. 流程
+            - RestTemplate->execute->doExecute->执行拦截器LoadBalancerInterceptor.intercept->LoadBalancerInterceptor.execute()
+            - LoadBalancerInterceptor.execute()->通过serviceId获得对应的ILoadBalancer(可以理解为负载均衡器)(ZoneAwareLoadBalancer为具体实现类)
+            - ILoadBalancer.choose 获得服务的实例对象,会根据不同的算法走到不同的实现类
+            - 转化为RibbonServer对象,里面包含service的名字,不是ip,因为微服务间通过服务名连接
+            - RibbonServer.apply 它借助负载均衡器重新构建了 uri 
+            - 回到RestTemplate 发送请求
 6. Hystrix(提供线程池，不同的服务走不同的线程池，实现了不同服务调用的隔离，避免了服务雪崩的问题,熔断)
     * 特点
         - 主要关注的三个参数
