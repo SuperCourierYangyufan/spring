@@ -1758,23 +1758,24 @@ PUT 请求、DELETE 请求以及一些通用的请求执行方法 exchange 以�
                 - 后面采用局部更新,先获取增量数据,为空则获取全量,否则更新,最后与注册中心比对appsHashcode
             
 4. Fetch(基于动态代理机制，根据注解和选择的机器，拼接请求 url 地址，发起请求)
-    - 流程
-        1. 通过@EnableFetchClients开启Fetch,根据规则,配置@FetchClient注解
-        2. Spring启动流程中会扫描@FetchClient的注解,并将这些类装入IOC容器中
-        3. 当请求FetchClient的方法时,会被拦截,拦截类为ReflectiveFetch(r fi de fan qi)
-        4. 然后转交到SynchronousMethodHandler类进行拦截的处理,当被拦截会根据参数生成RequestTemplate对象,该对象就是Http的请求模板
-        5. RequesTemplate在生成Request
-        6. Request交给Client去处理，其中Client可以是HttpUrlConnection、HttpClient也可以是Okhttp
-        7. 后Client被封装到LoadBalanceClient类，这个类结合类Ribbon做到了负载均衡。
-    - 特点
+    * 特点
         1. feign客户端默认超时时间是1秒，超时就出现异常,可以设置建立连接所用时间,和建立连接后读取资源时间
+    * 调用源码
+        1. 通过@EnableFetchClients开启Fetch,根据规则,配置@FetchClient注解
+        2. 调用时实际为FetchClientFactoryBean.getObject->getTarget();
+        3. 调用loadBalance()：创建接口实现类,主要构建了MethodHandler和里面的Client,重试器,拦截器
+        4. 而生成MethodHandler主要是通过重写解析的代码块,来解析springmvc的注解
+        5. 最后将MethodHandler放入集合中
+        6. 调用目标方法时,实际调用的是ReflectiveFeign,里面会获得MethodHandler执行invoke
+        7. SynchronousMethodHandler.invoke,主要做三件事
+            - 创建RequestTemplate,兼容Ribbon,进行增加RequestTemplate
+            - 获取Fetch参数配置,比如超时时间
+            - 发起请求
+        8. 发起请求前先构建能被Ribbon处理的格式
+        9. 通过selectServer,实际调用Ribbon底层chooseServer方法,进行负载均衡,替换地址,进行URL的重构
+        10. 最后获得Client,直接远程调用使用 jdk 自带的网络请求
+    * 初始化源码           
 5. Ribbon(实现负载均衡，从一个服务的多台机器中选择一台)
-    * 基本流程
-        - Ribbon的负载均衡，主要通过LoadBalancerClient来实现的
-        - LoadBalancerClient具体交给了ILoadBalancer来处理，ILoadBalancer通过配置IRule(核心Choose方法,用来选择一个实列)、IPing等信息，并向EurekaClient获取注册列表的信息
-        - 并默认10秒一次向EurekaClient发送“ping”,进而检查是否更新服务列表，最后，得到注册列表后，ILoadBalancer根据IRule的策略进行负载均衡。
-        - 而RestTemplate 被@LoadBalance注解后，能过用负载均衡
-        - 主要是维护了一个被@LoadBalance注解的RestTemplate列表，并给列表中的RestTemplate添加拦截器，进而交给负载均衡器去处理
     * 特点
         - Ribbon 的负载均衡思路，就是在发请求之前用拦截器先截住，替换 url 后再发请求
         - 默认ILoadBalancer为顶级接口,BaseLoadBalancer为Ribbon的默认实现,而cloud则重写,用ZoneAwareLoadBalancer
@@ -1793,6 +1794,8 @@ PUT 请求、DELETE 请求以及一些通用的请求执行方法 exchange 以�
             - 转化为RibbonServer对象,里面包含service的名字,不是ip,因为微服务间通过服务名连接
             - RibbonServer.apply 它借助负载均衡器重新构建了 uri 
             - 回到RestTemplate 发送请求
+    * 负载均衡策略
+        - 轮询|随机|取压力小的节点轮询,默认轮询|响应最快|轮询重试|并发量最小|默认规则，复合判断服务所在区域（region）的性能和服务的可用性选择服务器
 6. Hystrix(提供线程池，不同的服务走不同的线程池，实现了不同服务调用的隔离，避免了服务雪崩的问题,熔断)
     * 特点
         - 主要关注的三个参数
