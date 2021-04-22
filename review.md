@@ -1663,7 +1663,7 @@
     nodeId第一位一票,然后票最多的为master节点,然后解决脑裂问题需要设置最少票数为所有候选节点一半以上
 3. ElasticSearch搜索过程
     1. 因为存储时默认根据每条记录的Id字段做路由的,所以Es不知道那个Shard上有需要的结果,所以需要取多个Shard上的数据在分页后  
-    返回客户端之前会合并到一个排序后的list列表,所有先query,后fetch
+    返回客户端之前会合并到一个排序后的list列表,所有先query,后Feign
     2. query阶段,会广播到shard中,每个shard在本地执行查询后,生成一个命中文档的list,大小为from+size的总和,这也是为什么Es不要进行  
     深翻页的原因,因为后面from增大,需要查询的数据越多
     3. 然后这个队列只有存有id,然后根据size,取出list优先大小为size的id,发送到对应shard中,然后拉取相应数据,然后返回 
@@ -1757,19 +1757,20 @@ PUT 请求、DELETE 请求以及一些通用的请求执行方法 exchange 以�
                 - 第一次全量更新,获取信息默认都采用jersey构建的restful请求
                 - 后面采用局部更新,先获取增量数据,为空则获取全量,否则更新,最后与注册中心比对appsHashcode
             
-4. Fetch(基于动态代理机制，根据注解和选择的机器，拼接请求 url 地址，发起请求)
+4. Feign(基于动态代理机制，根据注解和选择的机器，拼接请求 url 地址，发起请求)
     * 特点
         1. feign客户端默认超时时间是1秒，超时就出现异常,可以设置建立连接所用时间,和建立连接后读取资源时间
     * 调用源码
-        1. 通过@EnableFetchClients开启Fetch,根据规则,配置@FetchClient注解
-        2. 调用时实际为FetchClientFactoryBean.getObject->getTarget();
+        1. 通过@EnableFeignClients开启Feign,根据规则,配置@FeignClient注解
+        2. 调用时实际为FeignClientFactoryBean.getObject->getTarget();
+            - 会判断注解是否含有fallback属性,若有,则进入targetWithFallback(),反射创建出降级的实现
         3. 调用loadBalance()：创建接口实现类,主要构建了MethodHandler和里面的Client,重试器,拦截器
         4. 而生成MethodHandler主要是通过重写解析的代码块,来解析springmvc的注解
         5. 最后将MethodHandler放入集合中
         6. 调用目标方法时,实际调用的是ReflectiveFeign,里面会获得MethodHandler执行invoke
         7. SynchronousMethodHandler.invoke,主要做三件事
             - 创建RequestTemplate,兼容Ribbon,进行增加RequestTemplate
-            - 获取Fetch参数配置,比如超时时间
+            - 获取Feign参数配置,比如超时时间
             - 发起请求
         8. 发起请求前先构建能被Ribbon处理的格式
         9. 通过selectServer,实际调用Ribbon底层chooseServer方法,进行负载均衡,替换地址,进行URL的重构
@@ -1805,17 +1806,20 @@ PUT 请求、DELETE 请求以及一些通用的请求执行方法 exchange 以�
             3. circuitBreaker.errorThresholdPercentage 断路器的窗口期内能够容忍的错误百分比阈值，默认为50（也就是说默认容忍50%的错误率）。  
             打个比方，假如一个窗口期内，发生了100次服务请求，其中50次出现了错误。在这样的情况下，断路器将会被打开。在该窗口期结束之前，  
             即使第51次请求没有发生异常，也将被执行fallback逻辑。
-            4. 综上所述，在以上三个参数缺省的情况下，Hystrix断路器触发的默认策略为:[在10秒内，发生20次以上的请求时，假如错误率达到50%以上，  则断路器将被打开。（当一个窗口期过去的时候，断路器将变成半开（HALF-OPEN）状态，如果这时候发生的请求正常，则关闭，否则又打开）]
+            4. 综上所述，在以上三个参数缺省的情况下，Hystrix断路器触发的默认策略为:[在10秒内，发生20次以上的请求时，假如错误率达到50%以上，    
+            则断路器将被打开。（当一个窗口期过去的时候，断路器将变成半开（HALF-OPEN）状态，如果这时候发生的请求正常(单线程,放一个真正请求进入)，  
+            则关闭，否则又打开）]
+            5. HystrixCommand采用AOP进行实现,里面使用Reactive(响应式编程)
     * 简单流程
-            1. 构造一个 HystrixCommand或HystrixObservableCommand对象，用于封装请求，并在构造方法配置请求被执行需要的参数
-            2. 执行命令，Hystrix提供了4种执行命令的方法
-            3. 判断是否使用缓存响应请求，若启用了缓存，且缓存可用，直接使用缓存响应请求。Hystrix支持请求缓存，但需要用户自定义启动
-            4. 判断熔断器是否打开，如果打开，跳到第8步
-            5. 判断线程池/队列/信号量是否已满，已满则跳到第8步；
-            6. 执行HystrixObservableCommand.construct()或HystrixCommand.run()，如果执行失败或者超时，跳到第8步；否则，跳到第9步
-            7. 统计熔断器监控指标
-            8. 走Fallback备用逻辑
-            9. 返回请求响应    
+        1. 构造一个 HystrixCommand或HystrixObservableCommand对象，用于封装请求，并在构造方法配置请求被执行需要的参数
+        2. 执行命令，Hystrix提供了4种执行命令的方法
+        3. 判断是否使用缓存响应请求，若启用了缓存，且缓存可用，直接使用缓存响应请求。Hystrix支持请求缓存，但需要用户自定义启动
+        4. 判断熔断器是否打开，如果打开，跳到第8步
+        5. 判断线程池/队列/信号量是否已满，已满则跳到第8步；
+        6. 执行HystrixObservableCommand.construct()或HystrixCommand.run()，如果执行失败或者超时，跳到第8步；否则，跳到第9步
+        7. 统计熔断器监控指标
+        8. 走Fallback备用逻辑
+        9. 返回请求响应    
 7. Zuul(网关管理，由 Zuul 网关转发请求给对应的服务)
 8. ConfigServer(集中式的分布式配置中心)
        
