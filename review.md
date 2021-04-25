@@ -1822,4 +1822,18 @@ PUT 请求、DELETE 请求以及一些通用的请求执行方法 exchange 以�
         9. 返回请求响应    
 7. Zuul(网关管理，由 Zuul 网关转发请求给对应的服务)
 8. ConfigServer(集中式的分布式配置中心)
+    * 流程
+        1. springBoot.run->准备运行环境时发布监听->监听者BootstrapApplicationListener.onApplicationEvent触发监听
+        2. 删除已经创建好的PropertySource,然后重新填充,再次构造一个SpringApplication,且不再构造web容器
+        3. 重新进入初始化流程,再次进入运行环境时发布监听处,换位ConfigFileApplicationListener触发监听
+        4. 把bootstrap.yml加载到Environment中,往后走启动流程代码,进入prepareContext.applyInitializers
+        5. 进入PropertySourceBootstrapConfiguration,然后调用restTemplate拉取配置
+    * 特点
+        1. ConfigServer 使用 Git 拉取配置时，会首先拉取整体所有的配置，后根据请求的配置应用、模式、分支来决定加载哪个配置文件
+        2. 热更新需要引入actuator,修改git后，调用/actuator/refresh会动态刷新配置文件
+            - 进入ContextRefresher.refresh,两个重要方法:刷新应用内置运行时环境,刷新所有refresh类型的Bean
+            - 刷新应用内置运行时环境:新模拟一次当前服务实例的启动，并拉取最新的配置，替换到当前服务的配置中.再广播事件,  
+            事件监听者会会重新初始化自身的属性映射,不会重新建,这样引用的地址不会改变
+            - 刷新所有refresh类型的Bean:先清除Refresh域的Bean,然后调用bean的时候再次走到getBean(),因为不为单例和多例,所以走到  
+            else块,通过bean工厂重新获得bean(懒加载逻辑)
        
