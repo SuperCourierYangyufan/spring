@@ -1821,5 +1821,13 @@ PUT 请求、DELETE 请求以及一些通用的请求执行方法 exchange 以�
         8. 走Fallback备用逻辑
         9. 返回请求响应    
 7. Zuul(网关管理，由 Zuul 网关转发请求给对应的服务)
+    * 流程
+        1. 客户端向zuul发起请求,走到DispatcherServlet
+        2. 重写HandleMapping,Adapter执行handle()时进入zuulController
+        3. zuulController转交给zuulServlet,zuulServlet则调用zuulRunner执行三个方法
+            - preRoute:封转参数,保证请求体能带到,新的请求体;
+            - route:利用Ribbon,Hystrix,根据url向对应的请求发送消息,并接受响应
+            - 处理响应,包括正常和异常的
+        4. 响应返回到对应的客户端
 8. ConfigServer(集中式的分布式配置中心)
        
