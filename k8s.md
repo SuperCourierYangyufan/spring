@@ -9,7 +9,12 @@
     - node
         * kubelet:master派到node的节点代表,管理本机容器的各种操作 
         * kube-proxy:提供网络代理,能实现负载均衡等操作
-2. pod:最小的部署单元,一组容器的集合,一个pod中的容器是共享网络的,生命周期短暂的,重启服务就更换了
+2. pod:最小的部署单元,一组容器的集合
+    - pod除了一个自己的根容器(pause)，还有多个我们部署的容器,每个自定义容器创建后会加入pause
+    - pod是一个多进程,每个docker是个单进程,运行多个应用程序
+    - 共享存储,存储到Volumn(数据卷),实现持久化的存储  
+    - 一个pod中的容器是共享网络的,更加容易互相调用
+    - 生命周期短暂的,重启服务就更换了
 3. controller,主要就是创建pod
     - 取保预期pod副本的数量 
     - 部署有状态(特点环境部署),无状态应用(无特殊环境,任意node可以迁移)
@@ -28,6 +33,33 @@
 5. kubectl get pod,svc
 6. kubectl get node 
 
+### yml-字段清单文件(两空格)
+1. 组成部分
+    - 控制器定义
+    - 被控制的对象
+2. 字段说明
+    - apiVersion API版本
+    - kind 资源类型
+    - metadata 资源元数据
+    - spec 资源规格
+    - replicas 副本数量
+    - selector 标签选择器
+    - template Pod模板
+    - metadata Pod元数据
+    - spec Pod规格
+    - containers 容器配置
+3. 快速编写
+    - kubectl create deployment web --image=nginx -o yaml --dry-run > m1.yaml
+    - kubectl get deploy nginx -o=yaml --export > m1.yaml
+
+### Pod
+1. 默认特性
+    - 可以进行资源限制,限制最小,最大的cpu,内存
+    - 镜像有三种拉取策略,镜像在宿主机不存在时拉取(默认)|每次拉取新的|不主动拉取
+    - Pod重启策略:当容器终止退出后,总是重启容器(默认)|当容器异常退出时,才重启|不重启
+2. 健康检查,支持两种
+    - 存活检查,检查失败,杀死容器,根据重启策略来判断是否重启
+    - 就绪检查,检查失败,从Pod中剔除容器
 ### 安装步骤
 ```
 kubeadm是官方社区推出的一个用于快速部署kubernetes集群的工具。
