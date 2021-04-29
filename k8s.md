@@ -20,6 +20,8 @@
     - 部署有状态(特点环境部署),无状态应用(无特殊环境,任意node可以迁移)
     - 一次性任务,定时任务                
 4. server:定义一组pod的访问规则
+    - 服务发现功能,防止Pod失联
+    - 负载均衡
 
 ### kubectl(酷不ctl)语法
 1. 基本 kubectl 操作 类型 名字 可选参数
@@ -29,9 +31,17 @@
     - 可选参数 可用-s指定server的地址和端口
 2. kubectl --help
 3. kubectl create deployment nginx --image=nginx
-4. kubectl export deployment nginx --port=80 --type=NodePort
-5. kubectl get pod,svc
+4. kubectl expose deployment nginx --port=80 --type=NodePort --target-port=80 --name=mynginx
+5. kubectl get pod,svc -o wide
 6. kubectl get node 
+7. kubectl label node node1 env_role=dev(分组)
+8. kubectl apply -f *.yaml
+9. kubectl set image deployment mynginx nginx=nginx:1.15(升级版本)
+10. kubectl rollout status deployment mynginx(查看版本升级是否成功)
+11. kubectl rollout history deployment mynginx(查看历史版本)
+12. kubectl rollout undo deployment mynginx(回滚上个版本) 
+13. kubectl rollout undo deployment mynginx --to-revision=1(回滚指定版本)
+14. kubectl scale deployment mynginx --replicas=10(创建10个副本,进行扩容)
 
 ### yml-字段清单文件(两空格)
 1. 组成部分
@@ -60,6 +70,18 @@
 2. 健康检查,支持两种
     - 存活检查,检查失败,杀死容器,根据重启策略来判断是否重启
     - 就绪检查,检查失败,从Pod中剔除容器
+3. 创建流程
+    - 通过apiserver创建pod,存储到etcd
+    - scheduler作为定时任务,监听新的pod,新的pod,通过apiserver,知道etcd
+    - 通过调度算法,把pod调度到某个node上
+    - 通过kubelet通过apiserver读取etcd,通过docker创建容器,把结果返回给etcd
+4. 可以通过env_role进行节点分组,区分开发,测试,生产节点,部署时只会到对应节点
+
+### Server
+1. server类型
+    - ClusterIp:集群内部使用 
+    - NodePort:对外暴露的服务
+    - LoadBalancer:也是对外暴露的服务,公有云
 ### 安装步骤
 ```
 kubeadm是官方社区推出的一个用于快速部署kubernetes集群的工具。
