@@ -31,7 +31,7 @@
     - 可选参数 可用-s指定server的地址和端口
 2. kubectl --help
 3. kubectl create deployment nginx --image=nginx
-4. kubectl expose deployment nginx --port=80 --type=NodePort --target-port=80 --name=mynginx
+4. kubectl expose deployment nginx --port=80 --type=NodePort --target-port=80 --name=mynginx 
 5. kubectl get pod,svc -o wide
 6. kubectl get node 
 7. kubectl label node node1 env_role=dev(分组)
@@ -42,6 +42,18 @@
 12. kubectl rollout undo deployment mynginx(回滚上个版本) 
 13. kubectl rollout undo deployment mynginx --to-revision=1(回滚指定版本)
 14. kubectl scale deployment mynginx --replicas=10(创建10个副本,进行扩容)
+15. kubectl get jobs
+16. kubectl delete pod mynginx
+17. kubectl delete deployment mynginx
+18. kubectl logs mynginx
+19. kubectl create -f secret.yaml
+20. kubectl exec -it mynginx bash
+21. kubectl create configmap myredis.conf --from-file=redis.properties
+22. kubectl get cm(查看configmap)
+23. kubectl describe cm myredis.conf
+24. kubectl get ns(查看命名空间)
+25. kubectl create ns myrole(创建命名空间)
+
 
 ### yml-字段清单文件(两空格)
 1. 组成部分
@@ -76,12 +88,37 @@
     - 通过调度算法,把pod调度到某个node上
     - 通过kubelet通过apiserver读取etcd,通过docker创建容器,把结果返回给etcd
 4. 可以通过env_role进行节点分组,区分开发,测试,生产节点,部署时只会到对应节点
+5. 亲和度就是节点条件,包括硬亲和性(必须满足),软亲和性(包含满足),是调度的属性
+6. 污点和污点容忍,是节点的属性,不是调度的属性。节点不做普通分配,让特定的pod,部署到特定节点
+    - 污点值有三个:一定不被调度|尽量不被调度| 不会调度,且驱逐Node已有的Pod
+    - 污点容忍:设置为一定不被调度,设置yaml可以污点容忍,就可以调度 
 
-### Server
+### Server&Controller
 1. server类型
     - ClusterIp:集群内部使用 
     - NodePort:对外暴露的服务
     - LoadBalancer:也是对外暴露的服务,公有云
+2. deployment为无状态控制器,StatefulSet为有状态控制器,DaemonSet为守护进程
+    - StatefulSet需要设置yaml中clusterIp:None
+    - StatefulSet会为每个Pod创建唯一的名称
+    - DaemonSet会为每一个node都执行这个Pod,新加入的也会执行
+3. 任务分为job(一次性),cronjob(定时任务)
+
+### 配置
+1. Secret(c 亏 ri 特),加载数据存到etcd中,让Pod容器以挂载Volume方式进行访问,如存凭证等等
+    - 创建Kind:Secret的yml,里面包含你需要存的信息,创建命令
+    - 可以以变量,或者以数据卷挂载到pod容器
+2. configMap存储不加密数据,加载到etcd中,同样可以以量,或者以数据卷挂载到pod容器,常用配置文件  
+3. 访问k8s集群需要三个步骤,然后进行访问时需要进过apiserver进行统一协调
+    - 认证
+        * 传输安全,对位不暴露8080,只能内部访问,对外使用6443
+        * 常用方式:HTTPS基于ca证书|httpToken|http用户密码
+    - 鉴权
+        * 基于RBAC(基于角色)控制访问
+    - 准入控制
+        * 若果列表有请求内容通过,没有拒绝
+4. Ingress类似于zuul吧
+
 ### 安装步骤
 ```
 kubeadm是官方社区推出的一个用于快速部署kubernetes集群的工具。
