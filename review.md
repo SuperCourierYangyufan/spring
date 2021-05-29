@@ -125,7 +125,7 @@
         - 先确定是否需要扩容,再插入值
         - 非线程安全，多线程环境下必须在外部增加同步限制，或者使用包装对象 List list = Collections.synchronizedList(new ArrayList(...))
         - 删除元素就是把元素后每一位都往前挪，时间复杂度为 O(n)
-        - 默认数组和快速失败次数两个元素采用transient关键字修饰,该关键字可让被修饰的成员属性变量不被序列化,原因是100大小的数组,只用了50个,默认  
+        - 默认数组和快速失败次数两个元素采用transient(tran zi an t)关键字修饰,该关键字可让被修饰的成员属性变量不被序列化,原因是100大小的数组,只用了50个,默认  
         会全部序列化。
         - 快速失败(modCount)用来记录 ArrayList 结构发生变化的次数，如果一个动作前后 modCount 的值不相等，说明 ArrayList 被其它线程修改了,主要是为了在使用迭代器时修改数组  
     2. LinkedList    
@@ -162,8 +162,7 @@
             - 新加入到红黑树的节点为红色节点
             - mysql不用红黑树的原因是数据多的时候太高了
         7. 新元素插入数组节点下列表时,7前采用头插法,8后采用尾插法
-            - 当采用头插法时,同时两个线程A,B进来,链表为(头)A->B(尾),然后扩容,先插入A,找到下一个节点B插入,新的链表为B->A,  
-            但是之前链表为A->B,一直找下一个会照成死循环,8采用红黑树,尾插法就没有这个问题
+            - A时间,进来1,2两个线程,此时链表a->b->c,1线程执行变成 c->b->a,然后2线程慢一点,先拿ab,发现c后面还有ab
         8. 为什么默认初始值为16?为什么初始化需要为2的幂
             - 这样是为了位运算的方便，位与运算比算数计算的效率高了很多，之所以选择16,因为是计算hash值为(hashCode & (16-1))  
             而16-1=15,15二进制就是1111,这样hashcode进行比较时,只需要看后几位。这样就将位运算代替了取模。
@@ -183,7 +182,7 @@
                                  int maximumPoolSize,  // 最大线程池大小  
                                  long keepAliveTime,  // 线程最大空闲时间  
                                  TimeUnit unit,  // 时间单位  
-                                 BlockingQueue<Runnable> workQueue, // 用于存放提交的任务，队列的实际容量与线程池大小相关联  
+                                 BlockingQueue<Runnable> workQueue, // 用于存放提交的任务，队列的实际容量与线程池大小相关联 
                                  ThreadFactory threadFactory,  // 线程工厂，用于创建线程，一般用默认即可    
                                  RejectedExecutionHandler handler )  //当任务太多来不及处理时，如何拒绝任务   
     2. 线程等待队列
@@ -382,7 +381,27 @@
         - redis分布式锁即可以结合zk分布式锁锁⾼度安全和memcached并发场景下效率很好的优点，其实现⽅式和memcached类似，  
         采⽤setnx即可实现。需要注意的是，这⾥的redis也需要设置超时时间，以避免死锁。可以利⽤jedis客户端实现。 
         - redis集群情况下,可能出现锁复制不及时等情况,还是使用redisLock之Redisson落地实现 
-        
+
+### zookeeper    
+1. 回调: java对回调有抽象的接口Watcher,提供了一些方法getData，exists ，addWatch,生产者改变会通知消费者
+    * getData、exists 以及 getChildren 注册的通知都是一次性的，当服务端通知过一次后，就会删除内存中的记录，之后如果仍然需要通知的话，  
+    客户端就要去继续注册，而 addWatch 注册的回调通知是永久性的，只需要注册一次可以一直被通知
+2. 存储,分为内存和磁盘
+    * ZK（内存)中的数据其实是一个树形结构，从 / 根节点开始，逐级向下用 / 分割,有点像Unix 中的目录结构,实际上是用的 HashMap 去存储整个树形结构 
+    * 磁盘上分为两种文件类型，一种是 log 文件(增量)，一种是 snapshot(全量)
+    * 对于每一次的写请求，ZK 是采取先记录磁盘再修改内存的,如果 ZK 是正常退出的话，也会强制刷磁盘文件和生成 snapshot，保证了一致性
+3. 角色
+    * 三种 Leader(主),Follower(可投票,可参选),Observer(可投票)   
+    * 所有写请求先交给leader,然后leader本地存储完毕后,发起一个提议,让其他节点本地归档,归档完成返回ack,半数ack后再发起commit的提议
+4. 顺序性,同一个客户端(一个长连接)是通过一个先进先出的队列保证,而不同客户端无法保证
+5. 连接会话
+    * 每一个客户端在连接至 ZK 后会被分配一个 sessionId，这个 sessionId 是通过当前时间戳、节点的 myid 和一个递增特性生成的  
+    一个 long 类型字段，可以保证不会重复
+    * 每一个客户端在连接 ZK 的时候会同时上报自己的超时时间，加上刚刚的 sessionId，ZK 的服务端会在本地维护一个映射关系
+    * 首先客户端的每次操作都会刷新这个超时时间，其次客户端必须设计一个 PING 的操作，用于在客户端空闲的时候主动去刷新会话超时时间，防止过期
+6. 节点类型,持久,持久顺序,临时,临时顺序
+    * 临时节点会随着客户端的会话断开而自动删除
+    * 顺序节点的区别就在于 ZK 会自动为路径加上数字的后缀
 
 ### 基础
 1. 反射
@@ -445,17 +464,16 @@
     * HTTPS工作原理
         1. 首先HTTP请求服务端生成证书,客户端对证书的有效期校验
         2. 客户端如果校验通过后，就根据证书的公钥生成私钥
-        3. 消息体产生的后，对它的摘要进行MD5（或者SHA1）算法加密，此时就得到了RSA签名
+        3. 消息体产生的后，对它的摘要进行MD
+        5（或者SHA1）算法加密，此时就得到了RSA签名
         4. 发送给服务端，此时只有服务端（RSA私钥）能解密
         5. 解密得到的随机数，再用AES加密，作为密钥
     * 一次完整的HTTP请求所经历的7个步骤
-        1. 建立TCP连接
-        2. Web浏览器向Web服务器发送请求行
-        3. Web浏览器发送请求头
-        4. Web服务器应答
-        5. Web服务器发送应答头
-        6. Web服务器向浏览器发送数据
-        7. Web服务器关闭TCP连接
+        1. DNS解析,网站变ip
+        2. TCP三次握手建立连接
+        3. http请求报文阶段
+        4. http响应报文阶段
+        5. TCP4次挥手阶段
     * Http1.1
         1. HTTP 1.1的持续连接
         2. HTTP 1.1增加host字段
@@ -482,6 +500,14 @@
     1. 基本可用,允许可用性降低(响应延长,服务降级)
     2. 软状态,允许系统中的数据存在中间状态,并认为该中间状态不会影响系统整体可用性
     3. 最终一致性
+12. java8新特性
+    1. Lambda 表达式
+    2. 方法引用
+    3. 接口默认方法
+    4. Stream API
+    5. Date Time API
+    6. Optional 类
+    
         
 ###Mybatis
 1. 一级缓存
@@ -760,7 +786,7 @@
             3. 将每个组的最后一条记录的地址偏移量单独提取出来按顺序存储到靠近页的尾部的地方,这就叫页目录
             4. 对于最小记录所在的分组只能有 1 条记录，最大记录所在的分组拥有的记录条数只能在 1~8 条之间，剩下的分组中记录的条数范围只能在是 4~8 条之间
             5. 在一个组中的记录数等于8个后再插入一条记录时，会将组中的记录拆分成两个组，一个组中4条记录，另一个5条记录
-            6. 在页中根据页目录查询记录步骤
+            6. 在页中根据页目录查询记录步骤  
                 1. 通过二分法确定该记录所在的槽，并找到该槽所在分组中主键值最小的那条记录
                 2. 通过记录的next_record属性遍历该槽所在的组中的各个记录。
     5. InnoDB 存储引擎是面向行的,也就是说数据是按行进行存放的，每个页存放的行记录也是有硬性定义的，最多允许存放7992 行记录
@@ -945,7 +971,9 @@
     1. 要求数据库表的每一列都是不可分割的原子数据项。
     2. 需要确保数据库表中的每一列都和主键相关，而不能只与主键的某一部分相关（主要针对联合主键而言）
     3. 需要确保数据表中的每一列数据都和主键直接相关，而不能间接相关
-
+15. 分库分表
+    1. mycat
+    2. sharding(瞎顶)-jdbc
 ### Spring源码部分       
 1. @Import 可以传入四种类型：普通类、配置类、ImportSelector 的实现类,ImportBeanDefinitionRegistrar的实现类
 2. 自动装配
@@ -1291,7 +1319,7 @@
     * createBean第一次执行后置处理器AbstractAutoProxyCreator(AspectJAwareAdvisorAutoProxyCreator)
     * 后置处理器里面本质上是创建动态代理的配置类,默认单例返回为空.里面就仅仅根据@aspect生成代理增强器放入IOC
     * 进入doCreateBean->initializeBean ->applyBeanPostProcessorsAfterInitialization 又回到AbstractAutoProxyCreator里进行正真代理
-    * AOP的核心执行都是执行织入的一组 MethodInterceptor ，AopProxy 类会借助下标索引来保证拦截器有序执行
+    * AOP的核心执行都是执行织入的一组 MethodInterceptor(in te sa bu te1) ，AopProxy 类会借助下标索引来保证拦截器有序执行
     * 后置处理器中先获取所有增加器,然后筛选出可用的,在加个ExposeInvocationInterceptor 类型的增强器
     * 创建代理工厂,将增加的代理器组合成一个增加器，放入工厂中,AOP的四种声明式通知注解，最终都会转化为对应的 MethodInterceptor ，并且它们都属于通知
     * 然后判断如果目标对象有接口，用jdk动态代理；没有接口，用cglib动态代理。
@@ -1342,8 +1370,19 @@
     * 工厂模式：BeanFactory
     * 观察者模式：Spring 事件驱动模型就是观察者模式很经典的一个应用，比如，ContextStartedEvent 就是 ApplicationContext 启动后触发的事件
     * 适配器模式：Spring MVC 中也是用到了适配器模式适配 Controller
-    
-    
+14. 面试回答流程
+    1. main->new springApplication()
+        - 首先判断运行环境是否为WebFlux,还是Reactive(ru a te fei),WebFlux
+        - 第一个回调,一般是用来加载上下文运行环境
+        - 加载spring.factory
+        - 从本方法开始往上爬，哪一层调用栈上有main方法，方法对应的类就是主配置类     
+    2. run方法
+        - 监控启动时间
+        - 即使没有检测到显示器也允许其继续启动
+        - 事件回调它包括Profile和Properties两大部分
+        - 打印Banner
+        - !创建和Application(IOC容器),和初始化(初始化就是首先把main类注册成BeanDefinition)
+    3. refreshContext    
     
     
     
@@ -1404,6 +1443,13 @@
     将队列中的请求一个个取出交给处理器,等处理完成后再拉取下一个请求
 8. REDIS集群脑裂以及解决方案?(min-replicas-to-write 3|min-replicas-max-lag 10)第一个参数表示最少的salve节点为3个,  
     第二个参数表示数据复制和同步的延迟不能超过10秒
+9. I/O复用模型
+    * 常见 select(O(n)),poll(O(n)),epoll(O(1))
+    * 网络IO也经常用文件描述符 FD 来表示
+    * 单个进程可监视的fd数量被限制|select无差别轮询所有流，找出能读出数据，或者写入数据的流，对他们进行操作
+    * poll它没有最大连接数的限制，原因是它是基于链表来存储的
+    * 因为epoll内核中实现是根据每个fd上的callback函数来实现的，只有活跃的socket才会主动调用callback,但是活跃度特别大时效率反而不及poll
+    * epoll通过内核和用户空间共享一块内存来实现的,select,poll内核需要将消息传递到用户空间，都需要内核拷贝动作
 ###  设计模式
 1. 分为三大类型(重要原则,对扩展开发，对修改封闭)
     * 创建型模式(这一类设计模式的目的是用于创建对象):抽象工程模式,工厂方法模式,单例模式,构建模式,原型模式
@@ -1737,7 +1783,7 @@ PUT 请求、DELETE 请求以及一些通用的请求执行方法 exchange 以�
         都一样,但是连接到从节点,写操作同步给master节点才能返回,而Eureka则是每个一样,所以需要同步操作,继而没办法满足数据一致性
         - 每隔10分钟同步一次集群节点,底层通过借助线程池完成定时任务,底层来更新节点信息
         - (Eureka自我保护)运行期间统计15分钟内失败比例是否低于85%,若低于则不会让实例过期,同时提出一个警告
-        - (优雅停服)actuator依赖,配置shutdown端点
+        - (优雅停服)actuator(a ct rui de)依赖,配置shutdown端点
         - Eureka高可用本质上就是将自己注册到别的注册中心上
         - Eureka分区概念,Region->Zone(1对多),理解为武汉(Region)下有汉阳机房(Zone)和武昌机房,消费端获取到对应Region下的Zone后,
         通过Zone获取到对应的ServiceUrls(服务列表地址),Ribbon默认访问同一个Zone下面的服务
@@ -1748,7 +1794,7 @@ PUT 请求、DELETE 请求以及一些通用的请求执行方法 exchange 以�
         4. EurekaServerInitializerConfiguration中为核心方法start,其中启动一个新线程,初始化,启动EurekaService,发布Eureka已注册的事件,  
         修改 EurekaServer 的运行状态,发布Eureka已启动的事件
     * 服务注册,续约,获取源码
-            1. EnableEurekaClient->EurekaClient构造方法->initScheduledTasks()->创建线程(InstanceInfoReplicator)->run()-> discoveryClient.register()
+            1. RefreshableEurekaClientConfiguration->CloudEurekaClient构造方法->initScheduledTasks()->创建线程(InstanceInfoReplicator)->run()-> discoveryClient.register()
             2. register是通过Rest请求方式实现,而register传入的参数为InstanceInfo对象,该对象就是注册给客户端的元数据,包含名称,ip,port....  
             可以通过eureka.instance.metadataMap.<key> = <value>格式来配置
             3. initScheduledTasks下创建了三个线程,除了上述的注册,还有服务获取,服务续约
@@ -1767,7 +1813,7 @@ PUT 请求、DELETE 请求以及一些通用的请求执行方法 exchange 以�
         3. 调用loadBalance()：创建接口实现类,主要构建了MethodHandler和里面的Client,重试器,拦截器
         4. 而生成MethodHandler主要是通过重写解析的代码块,来解析springmvc的注解
         5. 最后将MethodHandler放入集合中
-        6. 调用目标方法时,实际调用的是ReflectiveFeign,里面会获得MethodHandler执行invoke
+        6. 调用目标方法时,实际调用的是ReflectiveFeign(ru fai re te feng),里面会获得MethodHandler执行invoke
         7. SynchronousMethodHandler.invoke,主要做三件事
             - 创建RequestTemplate,兼容Ribbon,进行增加RequestTemplate
             - 获取Feign参数配置,比如超时时间
